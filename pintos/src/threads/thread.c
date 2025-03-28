@@ -233,6 +233,15 @@ thread_block (void)
   schedule ();
 }
 
+// ✅✅✅✅✅ - priority 기준으로 비교
+// bool
+// priority_comp (const struct list_elem *a, const struct list_elem *b)
+// {
+//   struct thread *t1 = list_entry(a, struct thread, elem);
+//   struct thread *t2 = list_entry(b, struct thread, elem);
+//   return t1->priority > t2->priority;
+// }
+
 /* Transitions a blocked thread T to the ready-to-run state.
    This is an error if T is not blocked.  (Use thread_yield() to
    make the running thread ready.)
@@ -251,6 +260,8 @@ thread_unblock (struct thread *t)
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
   list_push_back (&ready_list, &t->elem);
+  // ✅✅✅✅✅ - 넣을때부터 우선순위로 정렬되게
+  // list_insert_ordered (&ready_list, &t->elem, priority_comp, NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
