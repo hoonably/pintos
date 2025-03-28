@@ -234,13 +234,13 @@ thread_block (void)
 }
 
 // ✅✅✅✅✅ - priority 기준으로 비교
-// bool
-// priority_comp (const struct list_elem *a, const struct list_elem *b)
-// {
-//   struct thread *t1 = list_entry(a, struct thread, elem);
-//   struct thread *t2 = list_entry(b, struct thread, elem);
-//   return t1->priority > t2->priority;
-// }
+bool
+priority_comp (const struct list_elem *a, const struct list_elem *b, void *aux)
+{
+  struct thread *t1 = list_entry(a, struct thread, elem);
+  struct thread *t2 = list_entry(b, struct thread, elem);
+  return t1->priority > t2->priority;
+}
 
 /* Transitions a blocked thread T to the ready-to-run state.
    This is an error if T is not blocked.  (Use thread_yield() to
@@ -259,9 +259,10 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back (&ready_list, &t->elem);
+  // ❌❌❌❌❌ - FIFO 방식 삽입
+  // list_push_back (&ready_list, &t->elem);
   // ✅✅✅✅✅ - 넣을때부터 우선순위로 정렬되게
-  // list_insert_ordered (&ready_list, &t->elem, priority_comp, NULL);
+  list_insert_ordered (&ready_list, &t->elem, priority_comp, NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -376,8 +377,12 @@ thread_yield (void)
   ASSERT (!intr_context ());
 
   old_level = intr_disable ();
-  if (cur != idle_thread) 
-    list_push_back (&ready_list, &cur->elem);
+  if (cur != idle_thread) {
+    // ❌❌❌❌❌ - FIFO 방식 삽입
+    // list_push_back (&ready_list, &cur->elem);
+    // ✅✅✅✅✅ - 넣을때부터 우선순위로 정렬되게
+    list_insert_ordered (&ready_list, &cur->elem, priority_comp, NULL);
+  }
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -401,10 +406,17 @@ thread_foreach (thread_action_func *func, void *aux)
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
+// ✅✅✅✅✅ - 새로 설정된 우선순위가 ready_list 가장 앞 쓰레드의 우선순위보다 낮다면 yield
 void
 thread_set_priority (int new_priority) 
 {
   thread_current ()->priority = new_priority;
+
+  if(list_empty(&ready_list)) return;
+
+  struct thread *t = list_entry (list_begin(&ready_list), struct thread, elem);
+
+  if(thread_current()->priority < t->priority) thread_yield();
 }
 
 /* Returns the current thread's priority. */
