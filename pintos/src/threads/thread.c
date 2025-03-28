@@ -28,6 +28,10 @@ static struct list ready_list;
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
 
+// ✅✅✅✅✅ - 전역변수로 sleep list
+// 스레드가 sleep 상태인 경우 대기 목록에 추가하고, 타이머 인터럽트가 발생할 때 확인하고 깨우기
+static struct list sleep_list;
+
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -92,6 +96,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
+  list_init (&sleep_list);  // ✅✅✅✅✅
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -248,6 +253,51 @@ thread_unblock (struct thread *t)
   list_push_back (&ready_list, &t->elem);
   t->status = THREAD_READY;
   intr_set_level (old_level);
+}
+
+// ✅✅✅✅✅ - sleep_list에 넣고 block
+void
+thread_sleep (int64_t wake_up_ticks)
+{
+  enum intr_level old_level;
+
+  old_level = intr_disable ();  // 현재 인터럽트 상태 저장하고 비활성화
+
+  struct thread *cur_thread = thread_current();
+
+  // ASSERT (cur_thread != idle_thread);  // idle_thread는 sleep할 수 없으니까
+  
+  cur_thread->wake_up_ticks = wake_up_ticks;  // 깨어나야 할 시간 구조체에 저장
+  
+  list_push_back(&sleep_list, &cur_thread->elem);  // sleep_list에 추가
+  
+  thread_block();
+  
+  intr_set_level (old_level);
+}
+
+// ✅✅✅✅✅ - block된 sleep_list를 돌면서 wake up 할 시간이 됐다면 깨움
+void
+thread_wake_up (int64_t wake_up_ticks)
+{
+  // 리스트 비어있는걸 확인했어야함!!!
+  if (list_empty(&sleep_list)) return;
+  
+  struct list_elem *e = list_front(&sleep_list);
+  
+  // sleep_list를 돌면서 깨워야 할 스레드가 있는지 확인
+  while(e != list_end(&sleep_list)){  
+    struct thread *t = list_entry (e, struct thread, elem);
+    if(t->wake_up_ticks <= wake_up_ticks) {  // 깨워야 할 시간이 지났다면
+      struct list_elem *next = list_next(e);
+      list_remove(e);
+      thread_unblock(t);  // 스레드 unblock
+      e = next;
+    }
+    else {  // skip
+      e = list_next(e);
+    }
+  }
 }
 
 /* Returns the name of the running thread. */

@@ -87,11 +87,14 @@ struct thread
     enum thread_status status;          /* Thread state. */
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
+    // ⭐️⭐️⭐️⭐️⭐️ - 스레드의 우선순위 (0~63), 높은 숫자가 높은 우선순위
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
+    // ✅✅✅✅✅ - 스레드 깨어나야 할 시간
+    int64_t wake_up_ticks;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -115,6 +118,9 @@ void thread_print_stats (void);
 
 typedef void thread_func (void *aux);
 tid_t thread_create (const char *name, int priority, thread_func *, void *);
+
+void thread_sleep (int64_t ticks);  // ✅✅✅✅✅
+void thread_wake_up (int64_t ticks);  // ✅✅✅✅✅
 
 void thread_block (void);
 void thread_unblock (struct thread *);
