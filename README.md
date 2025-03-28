@@ -55,7 +55,7 @@ sudo docker build -t pintos .
 docker build --platform=linux/amd64 -t pintos .
 ```
 
-<details><summary> ⚠️ **Rosetta must be enabled** for x86_64 emulation on Apple Silicon. </summary>
+<details><summary> ⚠️ Rosetta must be enabled for x86_64 emulation on Apple Silicon. </summary>
 
 ![Rosetta Setting](https://github.com/user-attachments/assets/b73e6e6e-b851-4611-82ce-3899333feb6e)
 </details>
