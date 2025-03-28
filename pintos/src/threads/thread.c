@@ -264,6 +264,10 @@ thread_unblock (struct thread *t)
   // ✅✅✅✅✅ - 넣을때부터 우선순위로 정렬되게
   list_insert_ordered (&ready_list, &t->elem, priority_comp, NULL);
   t->status = THREAD_READY;
+
+  // ✅✅✅✅✅ - t의 우선순위가 현재 쓰레드보다 높다면 yield
+  if(thread_current() != idle_thread && thread_current()->priority < t->priority)
+    thread_yield();
   intr_set_level (old_level);
 }
 
