@@ -8,9 +8,8 @@
 
 >> Fill in the names and email addresses of your group members.
 
-FirstName LastName <email@domain.example>
+Jeonghoon Park <hoonably@unist.ac.kr>
 Deokhyeon Kim <ejrgus1404@unist.ac.kr>
-FirstName LastName <email@domain.example>
 
 ---- PRELIMINARIES ----
 
@@ -29,27 +28,53 @@ FirstName LastName <email@domain.example>
 >> A1: Copy here the declaration of each new or changed `struct' or
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
+      - 'sleep_list' : A static global list in thread.c that keeps track of sleeping threads, 
+            used by the timer interrupt to wake them up later.
+      - 'wake_up_ticks' : Stores when the thread should wake up. 
+            used by the timer interrupt to unblock it at the right time.
 
 ---- ALGORITHMS ----
 
 >> A2: Briefly describe what happens in a call to timer_sleep(),
 >> including the effects of the timer interrupt handler.
+      - timer_sleep() puts the current thread to sleep by calling thread_sleep(), 
+            which sets 'wake_up_ticks', adds the thread to 'sleep_list', and blocks it. 
+      - The thread no longer runs until explicitly unblocked.
+      - Each timer interrupt calls thread_wake_up(), which checks the 'sleep_list' and 
+            unblocks any thread whose 'wake_up_ticks' has passed. 
+      - This allows precise wake-up timing without busy-waiting.
+
 
 >> A3: What steps are taken to minimize the amount of time spent in
 >> the timer interrupt handler?
+      - The timer interrupt handler only calls thread_wake_up() to wake threads that need to run. 
+      - It only does comparisons and list_remove(), 
+            so it doesn't stay long in the handler, just unblocks threads quickly.
 
 ---- SYNCHRONIZATION ----
 
 >> A4: How are race conditions avoided when multiple threads call
 >> timer_sleep() simultaneously?
+      - Inside thread_sleep(), interrupts are disabled with intr_disable() 
+            before accessing sleep_list and blocking the thread. 
+      - This prevents race conditions even when multiple threads call timer_sleep() at the same time.
 
 >> A5: How are race conditions avoided when a timer interrupt occurs
 >> during a call to timer_sleep()?
+      - Before thread_sleep() modifies sleep_list or blocks the thread, it disables interrupts using intr_disable(). 
+      - This ensures the timer interrupt cannot run in the middle.
 
 ---- RATIONALE ----
 
 >> A6: Why did you choose this design?  In what ways is it superior to
 >> another design you considered?
+      - At first, I tried using a semaphore to make the thread sleep.
+      - I thought I had to use sema_down() to block the thread and sema_up() to wake it up later.
+      - But later I realized that a simple thread_block() is enough, 
+            since we don't need any actual synchronization—just sleeping.
+      - Also, intr_disable() was already enough, so I removed the semaphore to keep things simple.
+      - So I removed the semaphore part and changed the design 
+            to just use thread_block() and thread_unblock() with interrupts off.
 
        PRIORITY SCHEDULING
        ===================
@@ -98,57 +123,6 @@ FirstName LastName <email@domain.example>
       - At first, I tried to sort the 'ready_list' every time accessing the front of it.
         However, there is a risk of missing the sorting process, and it is ineffieient.
         So, we chose to insert threads in proper position to maintain the list aligned at all time.
-
-        ADVANCED SCHEDULER
-        ==================
-
----- DATA STRUCTURES ----
-
->> C1: Copy here the declaration of each new or changed `struct' or
->> `struct' member, global or static variable, `typedef', or
->> enumeration.  Identify the purpose of each in 25 words or less.
-
----- ALGORITHMS ----
-
->> C2: Suppose threads A, B, and C have nice values 0, 1, and 2.  Each
->> has a recent_cpu value of 0.  Fill in the table below showing the
->> scheduling decision and the priority and recent_cpu values for each
->> thread after each given number of timer ticks:
-
-timer  recent_cpu    priority   thread
-ticks   A   B   C   A   B   C   to run
------  --  --  --  --  --  --   ------
- 0
- 4
- 8
-12
-16
-20
-24
-28
-32
-36
-
->> C3: Did any ambiguities in the scheduler specification make values
->> in the table uncertain?  If so, what rule did you use to resolve
->> them?  Does this match the behavior of your scheduler?
-
->> C4: How is the way you divided the cost of scheduling between code
->> inside and outside interrupt context likely to affect performance?
-
----- RATIONALE ----
-
->> C5: Briefly critique your design, pointing out advantages and
->> disadvantages in your design choices.  If you were to have extra
->> time to work on this part of the project, how might you choose to
->> refine or improve your design?
-
->> C6: The assignment explains arithmetic for fixed-point math in
->> detail, but it leaves it open to you to implement it.  Why did you
->> decide to implement it the way you did?  If you created an
->> abstraction layer for fixed-point math, that is, an abstract data
->> type and/or a set of functions or macros to manipulate fixed-point
->> numbers, why did you do so?  If not, why not?
 
          SURVEY QUESTIONS
          ================

@@ -280,8 +280,6 @@ thread_sleep (int64_t wake_up_ticks)
   old_level = intr_disable ();  // 현재 인터럽트 상태 저장하고 비활성화
 
   struct thread *cur_thread = thread_current();
-
-  // ASSERT (cur_thread != idle_thread);  // idle_thread는 sleep할 수 없으니까
   
   cur_thread->wake_up_ticks = wake_up_ticks;  // 깨어나야 할 시간 구조체에 저장
   
