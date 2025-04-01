@@ -292,7 +292,7 @@ thread_sleep (int64_t wake_up_ticks)
 
 // ✅✅✅✅✅ - block된 sleep_list를 돌면서 wake up 할 시간이 됐다면 깨움
 void
-thread_wake_up (int64_t wake_up_ticks)
+thread_wake_up (int64_t now_tick)
 {
   // 리스트 비어있는걸 확인했어야함!!!
   if (list_empty(&sleep_list)) return;
@@ -302,7 +302,7 @@ thread_wake_up (int64_t wake_up_ticks)
   // sleep_list를 돌면서 깨워야 할 스레드가 있는지 확인
   while(e != list_end(&sleep_list)){  
     struct thread *t = list_entry (e, struct thread, elem);
-    if(t->wake_up_ticks <= wake_up_ticks) {  // 깨워야 할 시간이 지났다면
+    if(t->wake_up_ticks <= now_tick) {  // 깨워야 할 시간이 지났다면
       struct list_elem *next = list_next(e);
       list_remove(e);
       thread_unblock(t);  // 스레드 unblock
