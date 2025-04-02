@@ -147,3 +147,19 @@ the quarter.
 >> students, either for future quarters or the remaining projects?
 
 >> Any other comments?
+
+==== Peer Evaluation ====
+
++----------------------------+---------------------------------+
+
+|            Name            |          Contribution        |
+
++----------------------------+---------------------------------+
+
+| Jeonghoon                  |  50%, Implemented Alarm clock without priority
+
++----------------------------+---------------------------------+
+
+| Deokhyeon Kim              |  50%, Implemented Priority scheduling
+
++----------------------------+---------------------------------+
