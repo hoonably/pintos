@@ -156,7 +156,7 @@ the quarter.
 
 +----------------------------+---------------------------------+
 
-| Jeonghoon                  |  50%, Implemented Alarm clock without priority
+| Jeonghoon Park             |  50%, Implemented Alarm clock without priority
 
 +----------------------------+---------------------------------+
 
