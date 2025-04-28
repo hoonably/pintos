@@ -4,7 +4,46 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
+// ✅✅✅✅✅
+#include "threads/vaddr.h"
+#include "userprog/pagedir.h"
+
 static void syscall_handler (struct intr_frame *);
+
+// ✅✅✅✅✅
+// 미리 포인터를 검사하고 쓰기
+// - 이 주소가 PHYS_BASE보다 작나?
+// - 이 주소가 페이지 테이블에 매핑되어 있나?
+bool is_valid_user_ptr(const void *uaddr) {
+  if (uaddr == NULL) return false;
+  if (!is_user_vaddr(uaddr)) return false; // 유저 영역 주소? (vaddr < PHYS_BASE)
+  struct thread *cur_thread = thread_current();
+  if (pagedir_get_page(cur_thread->pagedir, uaddr) == NULL) return false; // physical address 매핑 안됐다면 NULL
+  return true;
+}
+
+// ✅✅✅✅✅
+/* Reads a byte at user virtual address UADDR.
+   UADDR must be below PHYS_BASE.
+   Returns the byte value if successful, -1 if a segfault
+   occurred. */
+static int get_user(const uint8_t *uaddr) {
+  if (!is_valid_user_ptr(uaddr))
+      return -1;
+  return *uaddr;
+}
+
+// ✅✅✅✅✅
+/* Writes BYTE to user address UDST.
+   UDST must be below PHYS_BASE.
+   Returns true if successful, false if a segfault occurred. */
+static bool put_user(uint8_t *udst, uint8_t byte) {
+  if (!is_valid_user_ptr(udst))
+      return false;
+  *udst = byte;
+  return true;
+}
+
 
 // ✅✅✅✅✅
 typedef int pid_t;
