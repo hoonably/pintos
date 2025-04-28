@@ -10,6 +10,8 @@
 #include "threads/thread.h"
 #include "devices/shutdown.h"
 #include "userprog/process.h"
+#include "filesys/filesys.h"
+#include "threads/synch.h"
 
 static void syscall_handler (struct intr_frame *);
 
@@ -243,7 +245,8 @@ int open(const char *file) {
   struct file *f = filesys_open(file);
 
   // fd = 0(STDIN_FILENO)은 표준 입력, fd = 1(STDOUT_FILENO)은 표준 출력, 실패하면 -1
-  int fd;  // ⭐️⭐️⭐️⭐️⭐️
+  int fd = -1;  // ⭐️⭐️⭐️⭐️⭐️ f 사용해서 구현해야함
+  
   lock_release(&file_lock);
   return fd;
 }
@@ -263,5 +266,5 @@ int write(int fd, const void *buffer, unsigned size) {
 }
 
 void close(int fd) {
-
+  // ⭐️⭐️⭐️⭐️⭐️ 구현해야함
 }
