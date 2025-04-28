@@ -70,7 +70,8 @@ start_process (void *file_name_)
     char *argv[30];
 
     argv[argc++] = program;
-    for(*token = strtok_r(NULL, " ", &args); token != NULL; token = strtok_r(NULL, " ", &args))
+    // ⭐️ pointer여서 수정했음
+    for(token = strtok_r(NULL, " ", &args); token != NULL; token = strtok_r(NULL, " ", &args))
       argv[argc++] = token;
 
     void *esp = if_.esp;
