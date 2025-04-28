@@ -59,7 +59,57 @@ start_process (void *file_name_)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (file_name, &if_.eip, &if_.esp);
+
+  // ✅✅✅✅✅ - 파싱해서 스택에 삽입하는 로직
+  char *program, *args, *token;
+  program = strtok_r(file_name, " ", &args);
+  success = load (program, &if_.eip, &if_.esp);
+
+  if(success) {
+    int argc = 0;
+    char *argv[30];
+
+    argv[argc++] = program;
+    for(*token = strtok_r(NULL, " ", &args); token != NULL; token = strtok_r(NULL, " ", &args))
+      argv[argc++] = token;
+
+    void *esp = if_.esp;
+    char *addr[30];
+    int i;
+    for(i = argc-1; i >= 0; --i) {
+      int len = strlen(argv[i])+1;
+      esp -= len;
+      memcpy(esp, argv[i], len);
+      addr[i] = esp;
+    }
+
+    uintptr_t sz = (uintptr_t)esp%4;
+    if(sz) {
+      esp -= sz;
+      memset(esp, 0, sz);
+    }
+
+    esp -= 4;
+    memset(esp, 0, 4);
+
+    for(i = argc-1; i >= 0; --i) {
+      esp -= 4;
+      memcpy(esp, &addr[i], 4);
+    }
+
+    char *argv_addr = esp;
+    esp -= 4;
+    memcpy(esp, &argv_addr, 4);
+
+    esp -= 4;
+    memcpy(esp, &argc, 4);
+
+    esp -= 4;
+    memset(esp, 0, 4);
+
+    if_.esp = esp;
+  }
+  // ✅✅✅✅✅ - 파싱해서 스택에 삽입하는 로직
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
