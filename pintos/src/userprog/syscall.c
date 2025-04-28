@@ -228,3 +228,34 @@ void exit(int status) {
   printf("%s: exit(%d)\n", cur_thread->name, status);
   thread_exit();
 }
+
+// 성공하면 true, 실패하면 false
+bool create(const char *file, unsigned initial_size) {
+  if (file == NULL) exit(-1);
+  return filesys_create(file, initial_size);
+}
+
+
+// 성공하면 새로운 파일 디스크립터(fd)를 반환, 실패하면 -1
+int open(const char *file) {
+  
+  return -1;
+}
+
+// 파일이나 콘솔로 데이터를 쓰기
+int write(int fd, const void *buffer, unsigned size) {
+  // 지금 Project 2-1에서는 write()를 완전히 다 구현할 필요는 없다.
+  // 딱 'fd == 1' (콘솔 출력)만 제대로 하면 된다.
+  if (fd == 1) {
+    putbuf(buffer, size);
+    return size;
+  }
+  // 2-2에서 구현 예정
+  else {
+    return 0;
+  }
+}
+
+void close(int fd) {
+
+}
