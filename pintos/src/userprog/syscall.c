@@ -4,9 +4,12 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
-// ✅✅✅✅✅
+// ✅✅✅✅✅ 
 #include "threads/vaddr.h"
 #include "userprog/pagedir.h"
+#include "threads/thread.h"
+#include "devices/shutdown.h"
+#include "userprog/process.h"
 
 static void syscall_handler (struct intr_frame *);
 
@@ -14,6 +17,7 @@ static void syscall_handler (struct intr_frame *);
 // 미리 포인터를 검사하고 쓰기
 // - 이 주소가 PHYS_BASE보다 작나?
 // - 이 주소가 페이지 테이블에 매핑되어 있나?
+bool is_valid_user_ptr(const void *uaddr);
 bool is_valid_user_ptr(const void *uaddr) {
   if (uaddr == NULL) return false;
   if (!is_user_vaddr(uaddr)) return false; // 유저 영역 주소? (vaddr < PHYS_BASE)
@@ -94,6 +98,113 @@ syscall_handler (struct intr_frame *f UNUSED)
       break;
     }
 
+    // case SYS_EXEC: {
+    //   if (!is_valid_user_ptr(f->esp + 4)) exit(-1);
+    //   const char *cmd_line = *(const char **)(f->esp + 4);
+    //   f->eax = exec(cmd_line);
+    //   break;
+    // }
+
+    // case SYS_WAIT: {
+    //   if (!is_valid_user_ptr(f->esp + 4)) exit(-1);
+    //   pid_t pid = *(pid_t *)(f->esp + 4);
+    //   f->eax = wait(pid);
+    //   break;
+    // }
+
+    case SYS_CREATE:
+    {
+        const char *file;
+        unsigned initial_size;
+        if (!is_user_vaddr(f->esp + 4) || !is_user_vaddr(f->esp + 8)) exit(-1);
+        file = *(char **)(f->esp + 4);
+        initial_size = *(unsigned *)(f->esp + 8);
+        f->eax = create(file, initial_size);
+        break;
+    }
+
+    // case SYS_REMOVE:
+    // {
+    //     const char *file;
+    //     if (!is_user_vaddr(f->esp + 4)) exit(-1);
+    //     file = *(char **)(f->esp + 4);
+    //     f->eax = remove(file);
+    //     break;
+    // }
+
+    case SYS_OPEN:
+    {
+        const char *file;
+        if (!is_user_vaddr(f->esp + 4)) exit(-1);
+        file = *(char **)(f->esp + 4);
+        f->eax = open(file);
+        break;
+    }
+
+    // case SYS_FILESIZE:
+    // {
+    //     int fd;
+    //     if (!is_user_vaddr(f->esp + 4)) exit(-1);
+    //     fd = *(int *)(f->esp + 4);
+    //     f->eax = filesize(fd);
+    //     break;
+    // }
+
+    // case SYS_READ:
+    // {
+    //     int fd;
+    //     void *buffer;
+    //     unsigned size;
+    //     if (!is_user_vaddr(f->esp + 4) || !is_user_vaddr(f->esp + 8) || !is_user_vaddr(f->esp + 12)) exit(-1);
+    //     fd = *(int *)(f->esp + 4);
+    //     buffer = *(void **)(f->esp + 8);
+    //     size = *(unsigned *)(f->esp + 12);
+    //     f->eax = read(fd, buffer, size);
+    //     break;
+    // }
+
+    case SYS_WRITE:
+    {
+        int fd;
+        const void *buffer;
+        unsigned size;
+        if (!is_user_vaddr(f->esp + 4) || !is_user_vaddr(f->esp + 8) || !is_user_vaddr(f->esp + 12)) exit(-1);
+        fd = *(int *)(f->esp + 4);
+        buffer = *(const void **)(f->esp + 8);
+        size = *(unsigned *)(f->esp + 12);
+        f->eax = write(fd, buffer, size);
+        break;
+    }
+
+    // case SYS_SEEK:
+    // {
+    //     int fd;
+    //     unsigned position;
+    //     if (!is_user_vaddr(f->esp + 4) || !is_user_vaddr(f->esp + 8)) exit(-1);
+    //     fd = *(int *)(f->esp + 4);
+    //     position = *(unsigned *)(f->esp + 8);
+    //     seek(fd, position);
+    //     break;
+    // }
+
+    // case SYS_TELL:
+    // {
+    //     int fd;
+    //     if (!is_user_vaddr(f->esp + 4)) exit(-1);
+    //     fd = *(int *)(f->esp + 4);
+    //     f->eax = tell(fd);
+    //     break;
+    // }
+
+    case SYS_CLOSE:
+    {
+        int fd;
+        if (!is_user_vaddr(f->esp + 4)) exit(-1);
+        fd = *(int *)(f->esp + 4);
+        close(fd);
+        break;
+    }
+
     default:
       // 이상한 syscall 번호가 들어오면 종료
       printf("System call number error: %d\n", syscall_num);
@@ -101,7 +212,6 @@ syscall_handler (struct intr_frame *f UNUSED)
   }
 }
 
-// ✅✅✅✅✅
 // 컴퓨터를 꺼버리는 시스템 콜
 // shutdown_power_off() 함수를 호출해서 PintOS를 완전히 종료
 // 주의: 이걸 호출하면 deadlock이나 에러 정보가 남지 않기 때문에, 정말 필요할 때만
@@ -109,7 +219,6 @@ void halt(void) {
   shutdown_power_off();
 }
 
-// ✅✅✅✅✅
 // 현재 스레드를 종료하고, 종료 상태를 반환
 // 만약 부모 프로세스가 자식 프로세스를 wait()하고 있었다면, 이 status 값을 부모가 받아감
 // 0 = 성공 / 0이 아닌 값 = 실패
