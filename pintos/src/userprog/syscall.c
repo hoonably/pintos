@@ -237,9 +237,15 @@ bool create(const char *file, unsigned initial_size) {
 
 
 // 성공하면 새로운 파일 디스크립터(fd)를 반환, 실패하면 -1
+struct lock file_lock;
 int open(const char *file) {
-  
-  return -1;
+  lock_acquire(&file_lock);
+  struct file *f = filesys_open(file);
+
+  // fd = 0(STDIN_FILENO)은 표준 입력, fd = 1(STDOUT_FILENO)은 표준 출력, 실패하면 -1
+  int fd;  // ⭐️⭐️⭐️⭐️⭐️
+  lock_release(&file_lock);
+  return fd;
 }
 
 // 파일이나 콘솔로 데이터를 쓰기
