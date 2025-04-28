@@ -71,6 +71,51 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
-  printf ("system call!\n");
-  thread_exit ();
+  // ❌❌❌❌❌
+  // printf ("system call!\n");
+  // thread_exit ();
+
+  // ✅✅✅✅✅
+  // 여기서 f->eaxsms System Call 리턴 값을 저장하는 레지스터
+  if (!is_valid_user_ptr(f->esp)) exit(-1);  // 유저 포인터 이상하면 바로 종료
+  
+  int syscall_num = get_user((uint8_t *) f->esp);
+  
+  // 각각 의 syscall에 맞는 인자들을 검사
+  switch (syscall_num) {
+    case SYS_HALT:
+      halt();
+      break;
+
+    case SYS_EXIT: {
+      if (!is_valid_user_ptr(f->esp + 4)) exit(-1);
+      int status = *(int *)(f->esp + 4);
+      exit(status);
+      break;
+    }
+
+    default:
+      // 이상한 syscall 번호가 들어오면 종료
+      printf("System call number error: %d\n", syscall_num);
+      exit(-1);
+  }
+}
+
+// ✅✅✅✅✅
+// 컴퓨터를 꺼버리는 시스템 콜
+// shutdown_power_off() 함수를 호출해서 PintOS를 완전히 종료
+// 주의: 이걸 호출하면 deadlock이나 에러 정보가 남지 않기 때문에, 정말 필요할 때만
+void halt(void) {
+  shutdown_power_off();
+}
+
+// ✅✅✅✅✅
+// 현재 스레드를 종료하고, 종료 상태를 반환
+// 만약 부모 프로세스가 자식 프로세스를 wait()하고 있었다면, 이 status 값을 부모가 받아감
+// 0 = 성공 / 0이 아닌 값 = 실패
+void exit(int status) {
+  struct thread *cur_thread = thread_current();
+  cur_thread->is_exit = status;
+  printf("%s: exit(%d)\n", cur_thread->name, status);
+  thread_exit();
 }

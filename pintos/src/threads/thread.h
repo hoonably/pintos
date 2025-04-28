@@ -96,10 +96,13 @@ struct thread
     // ✅✅✅✅✅ - 스레드 깨어나야 할 시간
     int64_t wake_up_ticks;
 
+    // ✅✅✅✅✅ - 자식 프로세스의 종료 상태
+    int is_exit;  // 0 = 성공, 0이 아닌 값 = 실패
+
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
-#endif
+    #endif
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
