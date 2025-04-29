@@ -29,7 +29,7 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 tid_t
 process_execute (const char *file_name) 
 {
-  char *fn_copy;
+  char *fn_copy, args;
   tid_t tid;
 
   /* Make a copy of FILE_NAME.
@@ -39,8 +39,11 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
+  // ✅✅✅✅✅ - arguments를 버리고 전달
+  char *program = strtok_r(file_name, " ", &args);
+
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (program, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
   return tid;
@@ -68,7 +71,7 @@ start_process (void *file_name_)
 
   if(success) {
     int argc = 0;
-    char *argv[30];
+    char *argv[32];
 
     argv[argc++] = program;
     // ⭐️ pointer여서 수정했음
@@ -76,7 +79,7 @@ start_process (void *file_name_)
       argv[argc++] = token;
 
     void *esp = if_.esp;
-    char *addr[30];
+    char *addr[32];
     int i;
     for(i = argc-1; i >= 0; --i) {
       int len = strlen(argv[i])+1;
