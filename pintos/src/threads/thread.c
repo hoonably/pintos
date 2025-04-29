@@ -28,7 +28,7 @@ static struct list ready_list;
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
 
-// ✅✅✅✅✅ - 전역변수로 sleep list
+// Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - 전역변수로 sleep list
 // 스레드가 sleep 상태인 경우 대기 목록에 추가하고, 타이머 인터럽트가 발생할 때 확인하고 깨우기
 static struct list sleep_list;
 
@@ -96,7 +96,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
-  list_init (&sleep_list);  // ✅✅✅✅✅
+  list_init (&sleep_list);  // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -189,6 +189,9 @@ thread_create (const char *name, int priority,
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
 
+  t->fd_idx = 2;  // ✅✅✅✅✅ - fd_table index 초기화
+  memset(t->fd_table, 0, sizeof(t->fd_table)); // ✅✅✅✅✅ - fd_table 초기화
+
   /* Prepare thread for first run by initializing its stack.
      Do this atomically so intermediate values for the 'stack' 
      member cannot be observed. */
@@ -233,7 +236,7 @@ thread_block (void)
   schedule ();
 }
 
-// ✅✅✅✅✅ - priority 기준으로 비교
+// Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - priority 기준으로 비교
 bool
 priority_comp (const struct list_elem *a, const struct list_elem *b, void *aux)
 {
@@ -261,17 +264,17 @@ thread_unblock (struct thread *t)
   ASSERT (t->status == THREAD_BLOCKED);
   // ❌❌❌❌❌ - FIFO 방식 삽입
   // list_push_back (&ready_list, &t->elem);
-  // ✅✅✅✅✅ - 넣을때부터 우선순위로 정렬되게
+  // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - 넣을때부터 우선순위로 정렬되게
   list_insert_ordered (&ready_list, &t->elem, priority_comp, NULL);
   t->status = THREAD_READY;
 
-  // ✅✅✅✅✅ - t의 우선순위가 현재 쓰레드보다 높다면 yield
+  // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - t의 우선순위가 현재 쓰레드보다 높다면 yield
   if(thread_current() != idle_thread && thread_current()->priority < t->priority)
     thread_yield();
   intr_set_level (old_level);
 }
 
-// ✅✅✅✅✅ - sleep_list에 넣고 block
+// Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - sleep_list에 넣고 block
 void
 thread_sleep (int64_t wake_up_ticks)
 {
@@ -290,7 +293,7 @@ thread_sleep (int64_t wake_up_ticks)
   intr_set_level (old_level);
 }
 
-// ✅✅✅✅✅ - block된 sleep_list를 돌면서 wake up 할 시간이 됐다면 깨움
+// Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - block된 sleep_list를 돌면서 wake up 할 시간이 됐다면 깨움
 void
 thread_wake_up (int64_t now_tick)
 {
@@ -382,7 +385,7 @@ thread_yield (void)
   if (cur != idle_thread) {
     // ❌❌❌❌❌ - FIFO 방식 삽입
     // list_push_back (&ready_list, &cur->elem);
-    // ✅✅✅✅✅ - 넣을때부터 우선순위로 정렬되게
+    // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - 넣을때부터 우선순위로 정렬되게
     list_insert_ordered (&ready_list, &cur->elem, priority_comp, NULL);
   }
   cur->status = THREAD_READY;
@@ -408,7 +411,7 @@ thread_foreach (thread_action_func *func, void *aux)
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
-// ✅✅✅✅✅ - 새로 설정된 우선순위가 ready_list 가장 앞 쓰레드의 우선순위보다 낮다면 yield
+// Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - 새로 설정된 우선순위가 ready_list 가장 앞 쓰레드의 우선순위보다 낮다면 yield
 void
 thread_set_priority (int new_priority) 
 {

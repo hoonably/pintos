@@ -13,12 +13,16 @@
 #include "filesys/filesys.h"
 #include "threads/synch.h"
 
+// ✅✅✅✅✅ - file 여러개 접근 방지 lock
+struct lock file_lock;
+
 static void syscall_handler (struct intr_frame *);
 
 // ✅✅✅✅✅
 // 미리 포인터를 검사하고 쓰기
 // - 이 주소가 PHYS_BASE보다 작나?
 // - 이 주소가 페이지 테이블에 매핑되어 있나?
+// pagedir 에서 user address를 uaddr라고 씀
 bool is_valid_user_ptr(const void *uaddr);
 bool is_valid_user_ptr(const void *uaddr) {
   if (uaddr == NULL) return false;
@@ -72,6 +76,9 @@ void
 syscall_init (void) 
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
+
+  // ✅✅✅✅✅ - 파일 작업 락 초기화
+  lock_init (&file_lock);
 }
 
 static void
@@ -246,13 +253,28 @@ bool create(const char *file, unsigned initial_size) {
 
 
 // 성공하면 새로운 파일 디스크립터(fd)를 반환, 실패하면 -1
-struct lock file_lock;
 int open(const char *file) {
   lock_acquire(&file_lock);
   struct file *f = filesys_open(file);
+  if (f == NULL) {
+    lock_release(&file_lock);  // 이거 안하면 deadlock
+    return -1;
+  }
 
+  struct thread *cur_thread = thread_current();
+  
   // fd = 0(STDIN_FILENO)은 표준 입력, fd = 1(STDOUT_FILENO)은 표준 출력, 실패하면 -1
-  int fd = -1;  // ⭐️⭐️⭐️⭐️⭐️ f 사용해서 구현해야함
+  // fd_table index 늘리면서 file discripter 리턴해야하니까 기록
+  int fd = cur_thread->fd_idx++;
+
+  if (fd >= FD_MAX) {
+    printf("File descriptor table is full\n");  // 디버깅용
+    file_close(f);
+    lock_release(&file_lock);
+    return -1;
+  }
+
+  cur_thread->fd_table[fd] = f;  // 파일 저장
   
   lock_release(&file_lock);
   return fd;
@@ -272,6 +294,19 @@ int write(int fd, const void *buffer, unsigned size) {
   }
 }
 
+// 파일 디스크립터(fd)를 닫기
+// fd가 표준 입출력(STDIN, STDOUT)이면 무시
+// fd가 범위 밖에 있으면 무시
+// 유효한 fd라면 해당 파일을 닫고 fd_table 엔트리를 NULL로 초기화
 void close(int fd) {
-  // ⭐️⭐️⭐️⭐️⭐️ 구현해야함
+  if (fd == 0 || fd == 1) return;  // 표준 입출력
+  
+  if (fd < 0 || fd >= FD_MAX) {
+    // printf("[close] File descriptor error: %d\n", fd);  // 디버깅용
+    return;
+  }
+  
+  struct thread *cur_thread = thread_current();
+  file_close (cur_thread->fd_table[fd]);
+  cur_thread->fd_table[fd] = NULL;
 }

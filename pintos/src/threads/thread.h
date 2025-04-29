@@ -24,6 +24,8 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
+#define FD_MAX 256  // ✅✅✅✅✅ - file descriptor 최대 개수 (palloc으로 하려면 나중에 수정하면 됨.)
+
 /* A kernel thread or user process.
 
    Each thread structure is stored in its own 4 kB page.  The
@@ -93,11 +95,15 @@ struct thread
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
-    // ✅✅✅✅✅ - 스레드 깨어나야 할 시간
+    // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - 스레드 깨어나야 할 시간
     int64_t wake_up_ticks;
 
     // ✅✅✅✅✅ - 자식 프로세스의 종료 상태
     int is_exit;  // 0 = 성공, 0이 아닌 값 = 실패
+
+    // ✅✅✅✅✅ - File Discripter Table
+    int fd_idx;  // 0 = stdin, 1 = stdout, 2 = file descriptor 시작
+    struct file *fd_table[FD_MAX];  // fd_table[0] = stdin, fd_table[1] = stdout
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -122,10 +128,10 @@ void thread_print_stats (void);
 typedef void thread_func (void *aux);
 tid_t thread_create (const char *name, int priority, thread_func *, void *);
 
-void thread_sleep (int64_t ticks);  // ✅✅✅✅✅
-void thread_wake_up (int64_t ticks);  // ✅✅✅✅✅
+void thread_sleep (int64_t ticks);  // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️
+void thread_wake_up (int64_t ticks);  // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️
 
-bool priority_comp (const struct list_elem *a, const struct list_elem *b, void *aux);  // ✅✅✅✅✅
+bool priority_comp (const struct list_elem *a, const struct list_elem *b, void *aux);  // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️
 
 void thread_block (void);
 void thread_unblock (struct thread *);
