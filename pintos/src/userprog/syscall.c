@@ -117,10 +117,14 @@ syscall_handler (struct intr_frame *f UNUSED)
     case SYS_CREATE:
     {
         const char *file;
+
         unsigned initial_size;
         if (!is_user_vaddr(f->esp + 4) || !is_user_vaddr(f->esp + 8)) exit(-1);
         file = *(char **)(f->esp + 4);
         initial_size = *(unsigned *)(f->esp + 8);
+
+        if (!is_valid_user_ptr(file)) exit(-1);
+
         f->eax = create(file, initial_size);
         break;
     }
@@ -139,6 +143,9 @@ syscall_handler (struct intr_frame *f UNUSED)
         const char *file;
         if (!is_user_vaddr(f->esp + 4)) exit(-1);
         file = *(char **)(f->esp + 4);
+
+        if (!is_valid_user_ptr(file)) exit(-1);
+
         f->eax = open(file);
         break;
     }
