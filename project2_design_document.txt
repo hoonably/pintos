@@ -28,6 +28,7 @@ Deokhyeon Kim <ejrgus1404@unist.ac.kr>
 >> A1: Copy here the declaration of each new or changed `struct' or
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
+
     - Nothing added.
 
 ---- ALGORITHMS ----
@@ -35,6 +36,7 @@ Deokhyeon Kim <ejrgus1404@unist.ac.kr>
 >> A2: Briefly describe how you implemented argument parsing.  How do
 >> you arrange for the elements of argv[] to be in the right order?
 >> How do you avoid overflowing the stack page?
+
     - I modified process_execute function so that it passes only the program name to the thread_create function not the whole command including arguments.
     - I added some code in the process_start function to parse arguments and push them in the stack.
       Below is the brief process of that code.
@@ -50,12 +52,14 @@ Deokhyeon Kim <ejrgus1404@unist.ac.kr>
 ---- RATIONALE ----
 
 >> A3: Why does Pintos implement strtok_r() but not strtok()?
+
     - Since strtok() uses static variable in the internal implementation, it is unsafe in the multi-thread environment.
       However, since strtok_r() uses external variable instead of static variable it is safe in multi-thread environment.
 
 >> A4: In Pintos, the kernel separates commands into a executable name
 >> and arguments.  In Unix-like systems, the shell does this
 >> separation.  Identify at least two advantages of the Unix approach.
+
     - Since kernel doesn't have to consider parsing, kernel code is must simple.
     - Kernel is much secure because program bugs related to parsing is restricted to user space (shell).
     - Shell is more flexible, we can make many variations of shells to satisfy user requirements.
@@ -69,9 +73,17 @@ Deokhyeon Kim <ejrgus1404@unist.ac.kr>
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+    - struct lock file_lock; → Global lock for controlling concurrent file system access
+    - typedef int pid_t; → process ID type for exec and wait
+    - int fd_idx; → next file discripter index
+    - struct file *fd_table[FD_MAX]; → file discripter table (FD_MAX=128 setting now)
+
 >> B2: Describe how file descriptors are associated with open files.
 >> Are file descriptors unique within the entire OS or just within a
 >> single process?
+
+    - Each thread (or process) manages its own file descriptors using a local fd_table array.
+    - File descriptors are not global. The descriptor number is valid only within the process and is independent of other processes.
 
 ---- ALGORITHMS ----
 
@@ -87,6 +99,11 @@ Deokhyeon Kim <ejrgus1404@unist.ac.kr>
 
 >> B5: Briefly describe your implementation of the "wait" system call
 >> and how it interacts with process termination.
+
+- In project 2-1, the process_wait() function was temporarily implemented using timer_msleep(3000) to simulate a blocking wait. 
+This was done only to allow related test cases to pass. 
+The function does not actually track or wait for child process termination. 
+A full implementation will be provided in project 2-2.
 
 >> B6: Any access to user program memory at a user-specified address
 >> can fail due to a bad pointer value.  Such accesses must cause the
