@@ -96,7 +96,7 @@ timer_sleep (int64_t ticks)
   // while (timer_elapsed (start) < ticks) 
   //   thread_yield ();
 
-  // ✅✅✅✅✅ - sleep
+  // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - sleep
   thread_sleep(start + ticks);
 }
 
@@ -176,7 +176,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_tick ();
-  // ✅✅✅✅✅ - sleep_list를 돌면서 wake up 할 시간에 깨워줌
+  // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - sleep_list를 돌면서 wake up 할 시간에 깨워줌
   thread_wake_up(ticks);
 }
 
