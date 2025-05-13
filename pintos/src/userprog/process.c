@@ -39,7 +39,7 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
-  // ✅✅✅✅✅ - arguments를 버리고 전달
+  // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - arguments를 버리고 전달
   char *program = strtok_r(file_name, " ", &args);
 
   /* Create a new thread to execute FILE_NAME. */
@@ -64,7 +64,7 @@ start_process (void *file_name_)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
 
-  // ✅✅✅✅✅ - 파싱해서 스택에 삽입하는 로직
+  // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - 파싱해서 스택에 삽입하는 로직
   char *program, *args, *token;
   program = strtok_r(file_name, " ", &args);
   success = load (program, &if_.eip, &if_.esp);
@@ -114,7 +114,7 @@ start_process (void *file_name_)
 
     if_.esp = esp;
   }
-  // ✅✅✅✅✅ - 파싱해서 스택에 삽입하는 로직
+  // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - 파싱해서 스택에 삽입하는 로직
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
@@ -154,6 +154,11 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
+
+  // ✅✅✅✅✅ - 자식 프로세스 종료를 기다리는 부모를 깨움
+  if (cur->parent != NULL) {
+    sema_up(&cur->s_wait);  // 부모가 wait() 중이면 깨워줌
+  }
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */

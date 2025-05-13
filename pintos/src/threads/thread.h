@@ -4,6 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "synch.h"  // ✅✅✅✅✅ - semaphores (sema_init, sema_down, sema_up...)
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -24,7 +25,7 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
-#define FD_MAX 256  // ✅✅✅✅✅ - file descriptor 최대 개수 (palloc으로 하려면 나중에 수정하면 됨.)
+#define FD_MAX 256  // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - file descriptor 최대 개수 (palloc으로 하려면 나중에 수정하면 됨.)
 
 /* A kernel thread or user process.
 
@@ -98,12 +99,31 @@ struct thread
     // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - 스레드 깨어나야 할 시간
     int64_t wake_up_ticks;
 
-    // ✅✅✅✅✅ - 자식 프로세스의 종료 상태
+    // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - 자식 프로세스의 종료 상태
     int is_exit;  // 0 = 성공, 0이 아닌 값 = 실패
 
-    // ✅✅✅✅✅ - File Discripter Table
+    // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - File Discripter Table
     int fd_idx;  // 0 = stdin, 1 = stdout, 2 = file descriptor 시작
     struct file *fd_table[FD_MAX];  // fd_table[0] = stdin, fd_table[1] = stdout
+
+   // ✅✅✅✅✅ - 부모 스레드
+    struct thread *parent;
+
+    // ✅✅✅✅✅ - 자식 스레드 리스트
+    struct list_elem child;
+    struct list child_list;
+
+    // ✅✅✅✅✅ - 자식 프로세스의 load()가 끝날 때까지 기다리는 세마포어
+    struct semaphore s_load;
+
+   // ✅✅✅✅✅ - 자식 프로세스의 종료 상태를 기다리는 세마포어
+   struct semaphore s_wait;
+
+   // ✅✅✅✅✅ - wait()를 중복 호출하지 않았는지 여부
+   bool is_wait;
+
+    // ✅✅✅✅✅ - 자식 프로세스가 load()를 끝냈는지 여부
+    bool is_load;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -127,6 +147,7 @@ void thread_print_stats (void);
 
 typedef void thread_func (void *aux);
 tid_t thread_create (const char *name, int priority, thread_func *, void *);
+struct thread *get_child (tid_t tid);// ✅✅✅✅✅
 
 void thread_sleep (int64_t ticks);  // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️
 void thread_wake_up (int64_t ticks);  // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️

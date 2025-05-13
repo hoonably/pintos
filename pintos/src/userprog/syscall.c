@@ -4,7 +4,7 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
-// ✅✅✅✅✅ 
+// Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ 
 #include "threads/vaddr.h"
 #include "userprog/pagedir.h"
 #include "threads/thread.h"
@@ -13,12 +13,12 @@
 #include "filesys/filesys.h"
 #include "threads/synch.h"
 
-// ✅✅✅✅✅ - file 여러개 접근 방지 lock
+// Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - file 여러개 접근 방지 lock
 struct lock file_lock;
 
 static void syscall_handler (struct intr_frame *);
 
-// ✅✅✅✅✅
+// Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️
 // 미리 포인터를 검사하고 쓰기
 // - 이 주소가 PHYS_BASE보다 작나?
 // - 이 주소가 페이지 테이블에 매핑되어 있나?
@@ -32,7 +32,7 @@ bool is_valid_user_ptr(const void *uaddr) {
   return true;
 }
 
-// ✅✅✅✅✅
+// Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️
 /* Reads a byte at user virtual address UADDR.
    UADDR must be below PHYS_BASE.
    Returns the byte value if successful, -1 if a segfault
@@ -43,7 +43,7 @@ static int get_user(const uint8_t *uaddr) {
   return *uaddr;
 }
 
-// ✅✅✅✅✅
+// Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️
 /* Writes BYTE to user address UDST.
    UDST must be below PHYS_BASE.
    Returns true if successful, false if a segfault occurred. */
@@ -55,7 +55,7 @@ static bool put_user(uint8_t *udst, uint8_t byte) {
 }
 
 
-// ✅✅✅✅✅
+// Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️
 typedef int pid_t;
 static void syscall_handler (struct intr_frame *);
 void halt(void);              // 시스템 종료
@@ -77,7 +77,7 @@ syscall_init (void)
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 
-  // ✅✅✅✅✅ - 파일 작업 락 초기화
+  // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - 파일 작업 락 초기화
   lock_init (&file_lock);
 }
 
@@ -88,7 +88,7 @@ syscall_handler (struct intr_frame *f UNUSED)
   // printf ("system call!\n");
   // thread_exit ();
 
-  // ✅✅✅✅✅
+  // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️
   // 여기서 f->eaxsms System Call 리턴 값을 저장하는 레지스터
   if (!is_valid_user_ptr(f->esp)) exit(-1);  // 유저 포인터 이상하면 바로 종료
   
@@ -107,19 +107,19 @@ syscall_handler (struct intr_frame *f UNUSED)
       break;
     }
 
-    // case SYS_EXEC: {
-    //   if (!is_valid_user_ptr(f->esp + 4)) exit(-1);
-    //   const char *cmd_line = *(const char **)(f->esp + 4);
-    //   f->eax = exec(cmd_line);
-    //   break;
-    // }
+    case SYS_EXEC: {
+      if (!is_valid_user_ptr(f->esp + 4)) exit(-1);
+      const char *cmd_line = *(const char **)(f->esp + 4);
+      f->eax = exec(cmd_line);
+      break;
+    }
 
-    // case SYS_WAIT: {
-    //   if (!is_valid_user_ptr(f->esp + 4)) exit(-1);
-    //   pid_t pid = *(pid_t *)(f->esp + 4);
-    //   f->eax = wait(pid);
-    //   break;
-    // }
+    case SYS_WAIT: {
+      if (!is_valid_user_ptr(f->esp + 4)) exit(-1);
+      pid_t pid = *(pid_t *)(f->esp + 4);
+      f->eax = wait(pid);
+      break;
+    }
 
     case SYS_CREATE:
     {
@@ -244,6 +244,35 @@ void exit(int status) {
   printf("%s: exit(%d)\n", cur_thread->name, status);
   thread_exit();
 }
+
+// ✅✅✅✅✅
+pid_t exec(const char *cmd_line) {
+  tid_t tid = process_execute(cmd_line);  // 새로운 스레드 생성
+  if (tid == TID_ERROR) return -1;
+
+  struct thread *child = get_child(tid);
+  if (child == NULL) return -1;
+
+  sema_down(&child->s_load);  // 자식의 load() 완료까지 대기
+  if (!child->is_load) return -1;
+
+  return tid;
+}
+
+// ✅✅✅✅✅
+int wait(pid_t pid){
+  struct thread *child = get_child(pid);
+  if (child == NULL) return -1;
+  if (child->is_wait) return -1; // 중복 wait 방지
+  else child->is_wait = true;
+
+  sema_down(&child->s_wait);  // 자식 종료 기다림
+  int status = child->is_exit;
+
+  list_remove(&child->child);
+  return status;
+}
+
 
 // 성공하면 true, 실패하면 false
 bool create(const char *file, unsigned initial_size) {

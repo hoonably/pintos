@@ -189,8 +189,11 @@ thread_create (const char *name, int priority,
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
 
-  t->fd_idx = 2;  // ✅✅✅✅✅ - fd_table index 초기화
-  memset(t->fd_table, 0, sizeof(t->fd_table)); // ✅✅✅✅✅ - fd_table 초기화
+  t->fd_idx = 2;  // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - fd_table index 초기화
+  memset(t->fd_table, 0, sizeof(t->fd_table)); // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - fd_table 초기화
+
+  t->parent = thread_current();  // ✅✅✅✅✅ - 자식의 parent 설정
+  list_push_back(&thread_current()->child_list, &t->child);  // ✅✅✅✅✅ - 자식 프로세스 리스트에 추가
 
   /* Prepare thread for first run by initializing its stack.
      Do this atomically so intermediate values for the 'stack' 
@@ -234,6 +237,21 @@ thread_block (void)
 
   thread_current ()->status = THREAD_BLOCKED;
   schedule ();
+}
+
+// ✅✅✅✅✅
+// 현재 스레드의 child_list 안에서 tid인 자식 프로세스를 찾아 리턴
+struct thread *get_child(tid_t tid) {
+  struct list_elem *e;
+  struct thread *cur_thread = thread_current();
+
+  for (e = list_begin(&cur_thread->child_list); e != list_end(&cur_thread->child_list); e = list_next(e)) {
+      struct thread *child = list_entry(e, struct thread, child);
+      if (child->tid == tid) {
+          return child;
+      }
+  }
+  return NULL;  // 못찾음
 }
 
 // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - priority 기준으로 비교
@@ -548,6 +566,14 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->magic = THREAD_MAGIC;
   list_push_back (&all_list, &t->allelem);
+
+  // ✅✅✅✅✅ - child 리스트 요소 초기화
+  list_init(&t->child_list);
+  sema_init(&t->s_load, 0);
+  sema_init(&t->s_wait, 0);
+  t->is_wait = false;
+  t->is_load = false;
+  // ✅✅✅✅✅ 
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
