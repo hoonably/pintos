@@ -29,25 +29,31 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 tid_t
 process_execute (const char *file_name) 
 {
-  char *fn_copy, args;
+  char *fn_copy, *fn_parse, args;
   tid_t tid;
 
-  /* Make a copy of FILE_NAME.
-     Otherwise there's a race between the caller and load(). */
-  fn_copy = palloc_get_page (0);
-  if (fn_copy == NULL)
+  // ✅✅✅✅✅ - 파싱용으로도 따로 만들어줘야함
+  fn_copy = palloc_get_page(0);
+  fn_parse = palloc_get_page(0);
+  if (fn_copy == NULL || fn_parse == NULL)
     return TID_ERROR;
-  strlcpy (fn_copy, file_name, PGSIZE);
 
-  // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - arguments를 버리고 전달
-  char *program = strtok_r(file_name, " ", &args);
+  strlcpy(fn_copy, file_name, PGSIZE);
+  strlcpy(fn_parse, file_name, PGSIZE);
+
+  // ✅✅✅✅✅ - 파싱용으로 따로 argument 버리고 전달
+  char *program = strtok_r(fn_parse, " ", &args);
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (program, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
+
+  palloc_free_page(fn_parse);  // ✅✅✅✅✅
+
   return tid;
 }
+
 
 /* A thread function that loads a user process and starts it
    running. */
