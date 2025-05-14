@@ -69,6 +69,13 @@ start_process (void *file_name_)
   program = strtok_r(file_name, " ", &args);
   success = load (program, &if_.eip, &if_.esp);
 
+
+  // ✅✅✅✅✅ - 자식 프로세스의 load 성공 여부 저장
+  thread_current()->is_load = success;
+
+  // ✅✅✅✅✅ - 부모 프로세스의 exec() 대기 해제 (load 완료 알림)
+  sema_up(&thread_current()->s_load);
+
   if(success) {
     int argc = 0;
     char *argv[32];
