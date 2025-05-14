@@ -32,16 +32,15 @@ process_execute (const char *file_name)
   char *fn_copy, *fn_parse, args;
   tid_t tid;
 
-  // ✅✅✅✅✅ - 파싱용으로도 따로 만들어줘야함
   fn_copy = palloc_get_page(0);
-  fn_parse = palloc_get_page(0);
+  fn_parse = palloc_get_page(0);  // ✅✅✅✅✅ - 파싱용으로도 따로 만들어줘야함
   if (fn_copy == NULL || fn_parse == NULL)
     return TID_ERROR;
 
   strlcpy(fn_copy, file_name, PGSIZE);
   strlcpy(fn_parse, file_name, PGSIZE);
 
-  // ✅✅✅✅✅ - 파싱용으로 따로 argument 버리고 전달
+  // 파싱용으로 따로 argument 버리고 전달
   char *program = strtok_r(fn_parse, " ", &args);
 
   /* Create a new thread to execute FILE_NAME. */
@@ -49,7 +48,7 @@ process_execute (const char *file_name)
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
 
-  palloc_free_page(fn_parse);  // ✅✅✅✅✅
+  palloc_free_page(fn_parse);
 
   return tid;
 }
@@ -156,9 +155,20 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  // ✅✅✅✅✅ 임시 해결
-  timer_msleep(3000);
-  return -1;
+  // 2-1에서 임시 해결
+  // timer_msleep(3000);
+  // return -1;
+  // ✅✅✅✅✅ - 자식 프로세스의 종료를 기다림
+  struct thread *child = get_child(child_tid);
+  if (child == NULL) return -1;  // 자식 스레드 없음
+  if (child->is_wait) return -1; // 중복 wait 방지
+  else child->is_wait = true;  
+
+  sema_down(&child->s_wait);  // 자식 종료 기다림
+  int status = child->is_exit;
+
+  list_remove(&child->child);
+  return status;
 }
 
 /* Free the current process's resources. */

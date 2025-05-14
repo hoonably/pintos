@@ -112,7 +112,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 
       const char *cmd_line = *(const char **)(f->esp + 4);
 
-      // ✅✅✅✅✅ - 문자열 전체가 유효한 메모리에 있는지 확인 (NULL까지 접근 가능해야 함)
+      // ✅✅✅✅✅ - 문자열 전체가 유효한 메모리에 있는지 확인 -> NULL까지 접근 가능
       const char *p = cmd_line;
       while (is_user_vaddr(p)) {
         // p가 유저 영역에 있더라고 해도, 실제로 페이지 테이블에 매핑 안되어있으면 NULL이니까 바로 exit(-1)
@@ -169,27 +169,27 @@ syscall_handler (struct intr_frame *f UNUSED)
         break;
     }
 
-    // case SYS_FILESIZE:
-    // {
-    //     int fd;
-    //     if (!is_user_vaddr(f->esp + 4)) exit(-1);
-    //     fd = *(int *)(f->esp + 4);
-    //     f->eax = filesize(fd);
-    //     break;
-    // }
+    case SYS_FILESIZE:
+    {
+        int fd;
+        if (!is_user_vaddr(f->esp + 4)) exit(-1);
+        fd = *(int *)(f->esp + 4);
+        f->eax = filesize(fd);
+        break;
+    }
 
-    // case SYS_READ:
-    // {
-    //     int fd;
-    //     void *buffer;
-    //     unsigned size;
-    //     if (!is_user_vaddr(f->esp + 4) || !is_user_vaddr(f->esp + 8) || !is_user_vaddr(f->esp + 12)) exit(-1);
-    //     fd = *(int *)(f->esp + 4);
-    //     buffer = *(void **)(f->esp + 8);
-    //     size = *(unsigned *)(f->esp + 12);
-    //     f->eax = read(fd, buffer, size);
-    //     break;
-    // }
+    case SYS_READ:  // filesize가 구현이 되어있어야 중간에 사용해서 성공함
+    {
+        int fd;
+        void *buffer;
+        unsigned size;
+        if (!is_user_vaddr(f->esp + 4) || !is_user_vaddr(f->esp + 8) || !is_user_vaddr(f->esp + 12)) exit(-1);
+        fd = *(int *)(f->esp + 4);
+        buffer = *(void **)(f->esp + 8);
+        size = *(unsigned *)(f->esp + 12);
+        f->eax = read(fd, buffer, size);
+        break;
+    }
 
     case SYS_WRITE:
     {
@@ -258,6 +258,9 @@ void exit(int status) {
 }
 
 // ✅✅✅✅✅
+// 새로운 사용자 프로세스를 실행하고 pid 반환
+// 자식 프로세스가 load에 성공할 때까지 부모는 대기
+// 실패 시 -1 반환
 pid_t exec(const char *cmd_line) {
   tid_t tid = process_execute(cmd_line);  // 새로운 스레드 생성
   if (tid == TID_ERROR) return -1;
@@ -272,17 +275,11 @@ pid_t exec(const char *cmd_line) {
 }
 
 // ✅✅✅✅✅
+// 자식 프로세스 pid의 종료를 기다리고 종료 코드를 반환
+// pid가 자식이 아니거나 이미 기다린 경우 -1 반환
+// 자식이 exit()을 호출하면 그 값을 반환
 int wait(pid_t pid){
-  struct thread *child = get_child(pid);
-  if (child == NULL) return -1;
-  if (child->is_wait) return -1; // 중복 wait 방지
-  else child->is_wait = true;
-
-  sema_down(&child->s_wait);  // 자식 종료 기다림
-  int status = child->is_exit;
-
-  list_remove(&child->child);
-  return status;
+  return process_wait(pid);
 }
 
 
@@ -321,7 +318,60 @@ int open(const char *file) {
   return fd;
 }
 
-// 파일이나 콘솔로 데이터를 쓰기
+// ✅✅✅✅✅
+// 열려 있는 파일 디스크립터 fd의 총 바이트 크기를 반환
+// 잘못된 fd이거나 닫힌 파일이면 -1 반환
+// 내부적으로 file_length() 사용
+int filesize(int fd) {
+  // file descriptor check & file check
+  if (fd < 2 || fd >= FD_MAX) return -1;
+  struct file *f = thread_current()->fd_table[fd];
+  if (f == NULL) return -1;
+
+  return file_length(f);
+}
+
+// ✅✅✅✅✅
+// fd로부터 size만큼 데이터를 읽어 buffer에 저장
+// fd == 0이면 키보드에서 입력, 그 외는 파일에서 읽음
+// 읽은 바이트 수 반환, 실패 시 -1
+int read(int fd, void *buffer, unsigned size) {
+  if (buffer == NULL) return -1;
+
+  // buffer 범위 전체가 유저 영역이면서 매핑된 메모리인지 확인
+  int i;  // 이거 밖에서 선언해줘야하는데 이거때매 고생함;;
+  for (i = 0; i < size; i++) {
+    // buffer라는 포인터를 byte 단위로 i만큼 이동한 주소가 유효한 user pointer인지 확인
+    if (!is_valid_user_ptr((char *)buffer + i))
+      exit(-1);
+  }
+
+  // fd == 0: 표준입력
+  if (fd == 0) {
+    for (i = 0; i < size; i++) {
+      // device/input.c의 input_getc()를 사용해서 키보드 입력을 받음
+      ((char *)buffer)[i] = input_getc();  // 한 글자씩
+    }
+    return size;
+  }
+
+  // file descriptor check & file check
+  if (fd < 2 || fd >= FD_MAX) return -1;
+  struct file *f = thread_current()->fd_table[fd];
+  if (f == NULL) return -1;
+
+  // 파일 읽기
+  lock_acquire(&file_lock);
+  int bytes_read = file_read(f, buffer, size);
+  lock_release(&file_lock);
+
+  return bytes_read;
+}
+
+
+// fd에 size만큼 buffer 내용을 씀
+// fd가 1이면 콘솔에 출력, 나머지는 미구현
+// 실제로 쓴 바이트 수를 반환
 int write(int fd, const void *buffer, unsigned size) {
   // 지금 Project 2-1에서는 write()를 완전히 다 구현할 필요는 없다.
   // 딱 'fd == 1' (콘솔 출력)만 제대로 하면 된다.
