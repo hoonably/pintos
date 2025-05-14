@@ -109,7 +109,19 @@ syscall_handler (struct intr_frame *f UNUSED)
 
     case SYS_EXEC: {
       if (!is_valid_user_ptr(f->esp + 4)) exit(-1);
+
       const char *cmd_line = *(const char **)(f->esp + 4);
+
+      // ✅✅✅✅✅ - 문자열 전체가 유효한 메모리에 있는지 확인 (NULL까지 접근 가능해야 함)
+      const char *p = cmd_line;
+      while (is_user_vaddr(p)) {
+        // p가 유저 영역에 있더라고 해도, 실제로 페이지 테이블에 매핑 안되어있으면 NULL이니까 바로 exit(-1)
+        if (pagedir_get_page(thread_current()->pagedir, p) == NULL)
+          exit(-1);
+        if (*p == '\0') break;  // 문자열 끝이면 검사 끝
+        p++;
+      }
+
       f->eax = exec(cmd_line);
       break;
     }
