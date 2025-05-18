@@ -206,6 +206,15 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
+  
+  // ✅✅✅✅✅ - fd_table에 있는 파일들 모두 닫아줌
+  int i;
+  for (i = 2; i < FD_MAX; i++) {
+    if (cur->fd_table[i]) {
+      file_close(cur->fd_table[i]);
+      cur->fd_table[i] = NULL;
+    }
+  }
 }
 
 /* Sets up the CPU for running user code in the current
