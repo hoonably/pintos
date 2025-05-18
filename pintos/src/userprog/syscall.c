@@ -13,6 +13,10 @@
 #include "filesys/filesys.h"
 #include "threads/synch.h"
 
+// ✅✅✅✅✅ 입출력 관련 헤더
+#include "devices/input.h"
+#include "filesys/file.h"
+
 // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - file 여러개 접근 방지 lock
 struct lock file_lock;
 
@@ -111,6 +115,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       if (!is_valid_user_ptr(f->esp + 4)) exit(-1);
 
       const char *cmd_line = *(const char **)(f->esp + 4);
+      if (!is_valid_user_ptr(cmd_line)) exit(-1);
 
       // ✅✅✅✅✅ - 문자열 전체가 유효한 메모리에 있는지 확인 -> NULL까지 접근 가능
       const char *p = cmd_line;
@@ -148,14 +153,14 @@ syscall_handler (struct intr_frame *f UNUSED)
         break;
     }
 
-    // case SYS_REMOVE:
-    // {
-    //     const char *file;
-    //     if (!is_user_vaddr(f->esp + 4)) exit(-1);
-    //     file = *(char **)(f->esp + 4);
-    //     f->eax = remove(file);
-    //     break;
-    // }
+    case SYS_REMOVE:
+    {
+        const char *file;
+        if (!is_user_vaddr(f->esp + 4)) exit(-1);
+        file = *(char **)(f->esp + 4);
+        f->eax = remove(file);
+        break;
+    }
 
     case SYS_OPEN:
     {
@@ -204,25 +209,25 @@ syscall_handler (struct intr_frame *f UNUSED)
         break;
     }
 
-    // case SYS_SEEK:
-    // {
-    //     int fd;
-    //     unsigned position;
-    //     if (!is_user_vaddr(f->esp + 4) || !is_user_vaddr(f->esp + 8)) exit(-1);
-    //     fd = *(int *)(f->esp + 4);
-    //     position = *(unsigned *)(f->esp + 8);
-    //     seek(fd, position);
-    //     break;
-    // }
+    case SYS_SEEK:
+    {
+        int fd;
+        unsigned position;
+        if (!is_user_vaddr(f->esp + 4) || !is_user_vaddr(f->esp + 8)) exit(-1);
+        fd = *(int *)(f->esp + 4);
+        position = *(unsigned *)(f->esp + 8);
+        seek(fd, position);
+        break;
+    }
 
-    // case SYS_TELL:
-    // {
-    //     int fd;
-    //     if (!is_user_vaddr(f->esp + 4)) exit(-1);
-    //     fd = *(int *)(f->esp + 4);
-    //     f->eax = tell(fd);
-    //     break;
-    // }
+    case SYS_TELL:
+    {
+        int fd;
+        if (!is_user_vaddr(f->esp + 4)) exit(-1);
+        fd = *(int *)(f->esp + 4);
+        f->eax = tell(fd);
+        break;
+    }
 
     case SYS_CLOSE:
     {
@@ -285,8 +290,19 @@ int wait(pid_t pid){
 
 // 성공하면 true, 실패하면 false
 bool create(const char *file, unsigned initial_size) {
-  if (file == NULL) exit(-1);
-  return filesys_create(file, initial_size);
+  if(!file) return 0;
+  lock_acquire(&file_lock);
+  bool ret = filesys_create(file, initial_size);
+  lock_release(&file_lock);
+  return ret;
+}
+
+bool remove(const char *file) {
+  if(!file) return 0;
+  lock_acquire(&file_lock);
+  bool ret = filesys_remove(file);
+  lock_release(&file_lock);
+  return ret;
 }
 
 
@@ -331,23 +347,41 @@ int filesize(int fd) {
   return file_length(f);
 }
 
+// ✅✅✅✅✅ - buffer가 valid한지 확인
+bool is_valid_buffer(const void* buffer, unsigned size) {
+  if(!buffer) return 0;
+
+  char *ptr;
+  struct thread *t = thread_current();
+  for(ptr = (char *)buffer; ptr < (char *)buffer + size; ptr++) {
+    if(!is_user_vaddr(ptr)) return 0;
+    if(!pagedir_get_page(t->pagedir, ptr)) return 0;
+  }
+  return 1;
+}
+
 // ✅✅✅✅✅
 // fd로부터 size만큼 데이터를 읽어 buffer에 저장
 // fd == 0이면 키보드에서 입력, 그 외는 파일에서 읽음
 // 읽은 바이트 수 반환, 실패 시 -1
 int read(int fd, void *buffer, unsigned size) {
-  if (buffer == NULL) return -1;
+  // ❌❌❌❌❌ - 예외처리 로직 변경
+  // if (buffer == NULL) return -1;
 
-  // buffer 범위 전체가 유저 영역이면서 매핑된 메모리인지 확인
-  int i;  // 이거 밖에서 선언해줘야하는데 이거때매 고생함;;
-  for (i = 0; i < size; i++) {
-    // buffer라는 포인터를 byte 단위로 i만큼 이동한 주소가 유효한 user pointer인지 확인
-    if (!is_valid_user_ptr((char *)buffer + i))
-      exit(-1);
-  }
+  // // buffer 범위 전체가 유저 영역이면서 매핑된 메모리인지 확인
+  // int i;  // 이거 밖에서 선언해줘야하는데 이거때매 고생함;;
+  // for (i = 0; i < size; i++) {
+  //   // buffer라는 포인터를 byte 단위로 i만큼 이동한 주소가 유효한 user pointer인지 확인
+  //   if (!is_valid_user_ptr((char *)buffer + i))
+  //     exit(-1);
+  // }
+
+  // ✅✅✅✅✅ - buffer가 valid한지 확인
+  if(!is_valid_buffer(buffer, size)) exit(-1);
 
   // fd == 0: 표준입력
   if (fd == 0) {
+    int i;
     for (i = 0; i < size; i++) {
       // device/input.c의 input_getc()를 사용해서 키보드 입력을 받음
       ((char *)buffer)[i] = input_getc();  // 한 글자씩
@@ -373,16 +407,42 @@ int read(int fd, void *buffer, unsigned size) {
 // fd가 1이면 콘솔에 출력, 나머지는 미구현
 // 실제로 쓴 바이트 수를 반환
 int write(int fd, const void *buffer, unsigned size) {
-  // 지금 Project 2-1에서는 write()를 완전히 다 구현할 필요는 없다.
-  // 딱 'fd == 1' (콘솔 출력)만 제대로 하면 된다.
+  // ✅✅✅✅✅ - buffer가 valid한지 확인
+  if(!is_valid_buffer(buffer, size)) exit(-1);
+
+  // ✅✅✅✅✅ - 콘솔에 출력
   if (fd == 1) {
     putbuf(buffer, size);
     return size;
   }
-  // 2-2에서 구현 예정
-  else {
-    return 0;
-  }
+
+  // ✅✅✅✅✅ - fd가 valid한지 확인
+  if(fd < 2 || fd >= FD_MAX) return -1;
+  struct file *f = thread_current()->fd_table[fd];
+  if(!f) return -1;
+
+  // ✅✅✅✅✅ - 파일에 출력
+  struct file *cur_file = thread_current()->cur_file;
+  lock_acquire(&file_lock);
+  int sz = file_write(f, buffer, size);
+  lock_release(&file_lock);
+  return sz;
+}
+
+// ✅✅✅✅✅ - fd 파일에서 현재 보고있는 위치를 position으로 변경
+void seek(int fd, unsigned position) {
+  if(fd < 2 || fd >= FD_MAX) return;
+  struct file *f = thread_current()->fd_table[fd];
+  if(!f) return;
+  file_seek(f, position);
+}
+
+// ✅✅✅✅✅ - fd 파일에서 현재 보고있는 위치를 반환
+unsigned tell(int fd) {
+  if(fd < 2 || fd >= FD_MAX) return -1;
+  struct file *f = thread_current()->fd_table[fd];
+  if(!f) return -1;
+  return file_tell(f);
 }
 
 // 파일 디스크립터(fd)를 닫기
@@ -390,13 +450,7 @@ int write(int fd, const void *buffer, unsigned size) {
 // fd가 범위 밖에 있으면 무시
 // 유효한 fd라면 해당 파일을 닫고 fd_table 엔트리를 NULL로 초기화
 void close(int fd) {
-  if (fd == 0 || fd == 1) return;  // 표준 입출력
-  
-  if (fd < 0 || fd >= FD_MAX) {
-    // printf("[close] File descriptor error: %d\n", fd);  // 디버깅용
-    return;
-  }
-  
+  if(fd < 2 || fd >= FD_MAX) return;
   struct thread *cur_thread = thread_current();
   file_close (cur_thread->fd_table[fd]);
   cur_thread->fd_table[fd] = NULL;

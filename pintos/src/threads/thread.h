@@ -125,6 +125,9 @@ struct thread
     // ✅✅✅✅✅ - 자식 프로세스가 load()를 끝냈는지 여부
     bool is_load;
 
+    // ✅✅✅✅✅ - 현재 실행중인 파일
+    struct file *cur_file;
+
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */

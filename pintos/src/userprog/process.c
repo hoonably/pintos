@@ -183,6 +183,13 @@ process_exit (void)
     sema_up(&cur->s_wait);  // 부모가 wait() 중이면 깨워줌
   }
 
+  // ✅✅✅✅✅ - 현재 실행중인 파일에 다시 쓰기가 가능하도록 바꿔줌
+  if(cur->cur_file) {
+    file_allow_write(cur->cur_file);
+    file_close(cur->cur_file);
+    cur->cur_file = NULL;
+  }
+
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
@@ -314,6 +321,10 @@ load (const char *file_name, void (**eip) (void), void **esp)
       goto done; 
     }
 
+  // ✅✅✅✅✅ - 현재 실행중인 파일에 쓰기 금지
+  t->cur_file = file;
+  file_deny_write(t->cur_file);
+
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
       || memcmp (ehdr.e_ident, "\177ELF\1\1\1", 7)
@@ -397,7 +408,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
  done:
   /* We arrive here whether the load is successful or not. */
-  file_close (file);
+  // ❌❌❌❌❌ - process_exit()에서 파일을 닫아야함
+  // file_close (file);
   return success;
 }
 
