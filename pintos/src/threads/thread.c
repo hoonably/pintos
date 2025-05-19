@@ -645,7 +645,7 @@ thread_schedule_tail (struct thread *prev)
   if (prev != NULL && prev->status == THREAD_DYING && prev != initial_thread) 
     {
       ASSERT (prev != cur);
-      // ✅✅✅✅✅ 부모가 이 자식을 wait() 호출한 경우에만 메모리 해제 허용
+      // ✅✅✅✅✅ prev->is_wait가 true(부모가 wait 호출 후 설정)일 때만 해제
       if (prev->is_wait == true)
         palloc_free_page (prev);
     }
