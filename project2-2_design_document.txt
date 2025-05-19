@@ -73,22 +73,35 @@ Deokhyeon Kim <ejrgus1404@unist.ac.kr>
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
-    - struct lock file_lock; → Global lock for controlling concurrent file system access
-    - typedef int pid_t; → process ID type for exec and wait
-    - int fd_idx; → next file discripter index
-    - struct file *fd_table[FD_MAX]; → file discripter table (FD_MAX=128 setting now)
+- struct thread *parent; → Links child thread to its parent, enabling wait() and resource management.
+- struct list_elem child; → Embeds thread in parent’s child_list, allowing retrieval during wait().
+- struct list child_list; → Stores all child threads for lookup and cleanup in wait() or parent exit.
+
+- struct semaphore s_load; → Synchronizes exec(): parent blocks until child finishes load, ensuring correct load result handling.
+- struct semaphore s_wait; → Used by parent to block until child exits, enabling correct wait() semantics.
+- bool is_wait; → Prevents duplicate wait() calls on the same child by tracking if wait was already called.
+- bool is_load; → Stores whether load() succeeded, enabling exec() to return -1 on failure.
+- int is_exit; → Holds the exit status code for this thread, returned to parent by wait().
+- struct file *cur_file; → Points to currently executing file; used to deny write access during execution.
 
 >> B2: Describe how file descriptors are associated with open files.
 >> Are file descriptors unique within the entire OS or just within a
 >> single process?
 
-    - Each thread (or process) manages its own file descriptors using a local fd_table array.
-    - File descriptors are not global. The descriptor number is valid only within the process and is independent of other processes.
+- Each thread (or process) manages its own file descriptors using a local fd_table array.
+- File descriptors are not global. The descriptor number is valid only within the process and is independent of other processes.
 
 ---- ALGORITHMS ----
 
 >> B3: Describe your code for reading and writing user data from the
 >> kernel.
+
+- We use “get_user()” and “put_user()” functions to safely access user memory from the kernel. 
+- These functions first validate the address using “is_valid_user_ptr()”, 
+which checks that the address is below “PHYS_BASE” and mapped in the page table. 
+- For buffers (e.g., in read, write), we validate the entire region with “is_valid_buffer()” 
+to avoid partial faults. Invalid pointers result in “exit(-1)” to terminate the offending process safely. 
+- This prevents kernel panics caused by invalid memory accesses.
 
 >> B4: Suppose a system call causes a full page (4,096 bytes) of data
 >> to be copied from user space into the kernel.  What is the least
@@ -97,13 +110,21 @@ Deokhyeon Kim <ejrgus1404@unist.ac.kr>
 >> for a system call that only copies 2 bytes of data?  Is there room
 >> for improvement in these numbers, and how much?
 
+- When copying 4096 bytes, the minimum number of pagedir_get_page() calls is 1 if all bytes are in the same page. 
+- The maximum is 4096 if each byte is checked individually. 
+- For 2 bytes, minimum is 1, maximum is 2 if they cross page boundaries. 
+- Our current implementation checks per byte. It could be improved by checking per-page using page-aligned ranges, 
+reducing lookups from O(n) to O(n / 4096), significantly improving performance for large buffers.
+
 >> B5: Briefly describe your implementation of the "wait" system call
 >> and how it interacts with process termination.
 
-- In project 2-1, the process_wait() function was temporarily implemented using timer_msleep(3000) to simulate a blocking wait. 
-This was done only to allow related test cases to pass. 
-The function does not actually track or wait for child process termination. 
-A full implementation will be provided in project 2-2.
+- In project 2-2, we replaced the temporary timer_msleep() used in 2-1 with a full implementation of process_wait(). 
+- Now, the parent process actively tracks the termination of a specific child by searching its child_list using get_child(). 
+- If the child exists and hasn’t been waited on (is_wait == false), the parent blocks on a semaphore (s_wait). 
+- When the child process exits, it calls sema_up(&s_wait) in process_exit(), waking up the parent. 
+- The exit status is passed via is_exit and returned to the parent. 
+- This approach ensures proper synchronization and resource cleanup, avoiding busy-waiting and supporting correct wait semantics.
 
 >> B6: Any access to user program memory at a user-specified address
 >> can fail due to a bad pointer value.  Such accesses must cause the
@@ -119,12 +140,26 @@ A full implementation will be provided in project 2-2.
 >> paragraphs, describe the strategy or strategies you adopted for
 >> managing these issues.  Give an example.
 
+- To safely access user memory, we use two helper functions: `is_valid_user_ptr()` for single addresses and `is_valid_buffer()` for ranges. 
+- These are called before dereferencing user pointers, e.g., in `syscall_handler()`, `read()`, and `write()`.
+- If a bad pointer is detected, we immediately call `exit(-1)` to safely terminate the process and avoid kernel panic. 
+- This centralized validation keeps syscall logic clean and avoids scattered checks.
+- Resources like open files are released in `process_exit()`. File locks are acquired and released in each operation to avoid leaks or deadlocks.
+- For example, `read(fd, buffer, size)` checks `is_valid_buffer()` first. On failure, it exits early, before any file operation.
+
 ---- SYNCHRONIZATION ----
 
 >> B7: The "exec" system call returns -1 if loading the new executable
 >> fails, so it cannot return before the new executable has completed
 >> loading.  How does your code ensure this?  How is the load
 >> success/failure status passed back to the thread that calls "exec"?
+
+- To synchronize `exec()`, we use a semaphore `s_load` in the child thread. 
+- The parent calls `sema_down(&child->s_load)` after creating the child via `process_execute()`. 
+- In the child’s `start_process()`, once `load()` completes, the result is stored in `is_load`, and `sema_up(&s_load)` wakes the parent.
+- The parent resumes and checks `is_load`.
+- If loading failed, `exec()` returns -1. This guarantees that `exec()` returns only after the child finishes loading, 
+and that the return value reflects success or failure.
 
 >> B8: Consider parent process P with child process C.  How do you
 >> ensure proper synchronization and avoid race conditions when P
@@ -133,16 +168,48 @@ A full implementation will be provided in project 2-2.
 >> terminates without waiting, before C exits?  After C exits?  Are
 >> there any special cases?
 
+- We use a `s_wait` semaphore and `is_wait` flag to synchronize the wait-exit interaction and avoid race conditions. 
+- If the parent calls `wait()` before the child exits, it blocks on `s_wait` until the child signals completion via `sema_up()` in `process_exit()`. 
+- If the child exits first, the exit status is saved in `is_exit`, 
+and `s_wait` ensures the parent can still retrieve the result later when it calls `wait()`.
+- The `is_wait` flag also prevents multiple `wait()` calls on the same child. 
+- Once the exit status is collected, the child is removed from the `child_list`, 
+and its memory is freed in `thread_schedule_tail()` if `is_wait` is true.
+- If the parent exits without ever calling `wait()`, the child proceeds normally and exits on its own. 
+- However, in this case, its memory is not freed because `is_wait` is never set. This leads to a potential memory leak.
+- We chose this design for simplicity and correctness, and it passes all test cases. 
+- In a production-grade OS, we would add a reference count or orphan cleanup mechanism to free such resources.
+- This design ensures correct synchronization and cleanup in most cases, and avoids race conditions and use-after-free errors.
+
 ---- RATIONALE ----
 
 >> B9: Why did you choose to implement access to user memory from the
 >> kernel in the way that you did?
 
+- We implemented user memory access checks using `is_valid_user_ptr()` and `is_valid_buffer()` to ensure both safety and clarity. 
+- This avoids undefined behavior from invalid memory and protects the kernel from user-induced faults.
+- We chose to validate pointers *before* any dereference to keep syscall logic clean and centralized. 
+- Invalid pointers result in `exit(-1)`, which safely terminates the process without risking kernel panic.
+- This design separates validation from core logic, improving readability and maintainability. 
+- It also fails fast on invalid input, which is preferable to scattered try-catch-style handling in C.
+
 >> B10: What advantages or disadvantages can you see to your design
 >> for file descriptors?
 
+- We implemented file descriptors using a statically allocated array `fd_table[FD_MAX]` and an integer `fd_idx` to track the next available slot. 
+- This design is simple and fast: file access is fast via array indexing, and implementation complexity is low.
+- However, it has limitations. The size is fixed, so a process cannot open more than `FD_MAX` files. 
+- Also, `fd_idx` increases monotonically and doesn't reuse closed slots, which may lead to fragmentation or early exhaustion.
+- This design is sufficient for Pintos, but not ideal for systems requiring scalability or file descriptor recycling.
+
 >> B11: The default tid_t to pid_t mapping is the identity mapping.
 >> If you changed it, what advantages are there to your approach?
+
+- We kept the default identity mapping between `tid_t` and `pid_t`, as it was sufficient for all required operations. 
+- Since each thread has a unique `tid`, and we only needed basic parent-child process tracking,
+introducing a separate mapping would have added unnecessary complexity without benefit.
+- If we had changed the mapping (e.g., to avoid PID reuse or support real process group IDs), 
+it could improve abstraction and security. But for Pintos, identity mapping is simple, efficient, and enough.
 
                SURVEY QUESTIONS
                ================
