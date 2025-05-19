@@ -113,19 +113,20 @@ struct thread
     struct list_elem child;
     struct list child_list;
 
-    // ✅✅✅✅✅ - 자식 프로세스의 load()가 끝날 때까지 기다리는 세마포어
+    
+    // ✅✅✅✅✅ - exec에서 부모가 자식의 load() 완료까지 대기
     struct semaphore s_load;
 
-   // ✅✅✅✅✅ - 자식 프로세스의 종료 상태를 기다리는 세마포어
+   // ✅✅✅✅✅ - wait()에서 부모가 자식의 종료를 대기
    struct semaphore s_wait;
 
-   // ✅✅✅✅✅ - wait()를 중복 호출하지 않았는지 여부
+   // ✅✅✅✅✅ - 중복 wait 호출 방지용 플래그
    bool is_wait;
 
-    // ✅✅✅✅✅ - 자식 프로세스가 load()를 끝냈는지 여부
+    // ✅✅✅✅✅ - 자식의 load 성공 여부를 부모에게 전달
     bool is_load;
 
-    // ✅✅✅✅✅ - 현재 실행중인 파일
+    // ✅✅✅✅✅ - 실행 중인 파일에 대한 포인터, 쓰기 방지
     struct file *cur_file;
 
 #ifdef USERPROG

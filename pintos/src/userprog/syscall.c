@@ -404,7 +404,7 @@ int read(int fd, void *buffer, unsigned size) {
 
 
 // fd에 size만큼 buffer 내용을 씀
-// fd가 1이면 콘솔에 출력, 나머지는 미구현
+// fd == 1이면 콘솔, 그 외에는 열린 파일에 기록
 // 실제로 쓴 바이트 수를 반환
 int write(int fd, const void *buffer, unsigned size) {
   // ✅✅✅✅✅ - buffer가 valid한지 확인
