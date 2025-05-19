@@ -303,7 +303,7 @@ bool remove(const char *file) {
   bool ret = filesys_remove(file);
   lock_release(&file_lock);
   return ret;
-}
+} 
 
 
 // 성공하면 새로운 파일 디스크립터(fd)를 반환, 실패하면 -1
@@ -365,18 +365,7 @@ bool is_valid_buffer(const void* buffer, unsigned size) {
 // fd == 0이면 키보드에서 입력, 그 외는 파일에서 읽음
 // 읽은 바이트 수 반환, 실패 시 -1
 int read(int fd, void *buffer, unsigned size) {
-  // ❌❌❌❌❌ - 예외처리 로직 변경
-  // if (buffer == NULL) return -1;
 
-  // // buffer 범위 전체가 유저 영역이면서 매핑된 메모리인지 확인
-  // int i;  // 이거 밖에서 선언해줘야하는데 이거때매 고생함;;
-  // for (i = 0; i < size; i++) {
-  //   // buffer라는 포인터를 byte 단위로 i만큼 이동한 주소가 유효한 user pointer인지 확인
-  //   if (!is_valid_user_ptr((char *)buffer + i))
-  //     exit(-1);
-  // }
-
-  // ✅✅✅✅✅ - buffer가 valid한지 확인
   if(!is_valid_buffer(buffer, size)) exit(-1);
 
   // fd == 0: 표준입력
@@ -403,30 +392,29 @@ int read(int fd, void *buffer, unsigned size) {
 }
 
 
-// fd에 size만큼 buffer 내용을 씀
+// ✅✅✅✅✅ - fd에 size만큼 buffer 내용을 씀
 // fd == 1이면 콘솔, 그 외에는 열린 파일에 기록
 // 실제로 쓴 바이트 수를 반환
 int write(int fd, const void *buffer, unsigned size) {
-  // ✅✅✅✅✅ - buffer가 valid한지 확인
+  // buffer가 valid한지 확인
   if(!is_valid_buffer(buffer, size)) exit(-1);
 
-  // ✅✅✅✅✅ - 콘솔에 출력
+  // 콘솔에 출력
   if (fd == 1) {
     putbuf(buffer, size);
     return size;
   }
 
-  // ✅✅✅✅✅ - fd가 valid한지 확인
-  if(fd < 2 || fd >= FD_MAX) return -1;
+  // file descriptor check & file check
+  if (fd < 2 || fd >= FD_MAX) return -1;
   struct file *f = thread_current()->fd_table[fd];
-  if(!f) return -1;
+  if (f == NULL) return -1;
 
-  // ✅✅✅✅✅ - 파일에 출력
-  struct file *cur_file = thread_current()->cur_file;
+  // 파일에 출력
   lock_acquire(&file_lock);
-  int sz = file_write(f, buffer, size);
+  int bytes_write = file_write(f, buffer, size);
   lock_release(&file_lock);
-  return sz;
+  return bytes_write;
 }
 
 // ✅✅✅✅✅ - fd 파일에서 현재 보고있는 위치를 position으로 변경

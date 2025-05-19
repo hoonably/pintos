@@ -155,19 +155,15 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  // 2-1에서 임시 해결
-  // timer_msleep(3000);
-  // return -1;
-  // ✅✅✅✅✅ - 자식 프로세스의 종료를 기다림
   struct thread *child = get_child(child_tid);
-  if (child == NULL) return -1;  // 자식 스레드 없음
-  if (child->is_wait) return -1; // 중복 wait 방지
-  else child->is_wait = true;  
+  if (child == NULL) return -1;       // 자식이 아닌 경우
+  if (child->is_wait) return -1;      // 이미 wait()한 경우
+  
+  child->is_wait = true;              // 중복 방지 플래그 설정
+  sema_down(&child->s_wait);          // 자식이 죽을 때까지 대기
 
-  sema_down(&child->s_wait);  // 자식 종료 기다림
-  int status = child->is_exit;
-
-  list_remove(&child->child);
+  int status = child->is_exit;        // 자식의 종료코드 획득
+  list_remove(&child->child);         // child_list에서 제거
   return status;
 }
 

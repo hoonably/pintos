@@ -106,28 +106,20 @@ struct thread
     int fd_idx;  // 0 = stdin, 1 = stdout, 2 = file descriptor 시작
     struct file *fd_table[FD_MAX];  // fd_table[0] = stdin, fd_table[1] = stdout
 
-   // ✅✅✅✅✅ - 부모 스레드
-    struct thread *parent;
+   // ✅✅✅✅✅ - 새로운 thread 구조체 변수
+   struct thread *parent;  // 부모 스레드
 
-    // ✅✅✅✅✅ - 자식 스레드 리스트
-    struct list_elem child;
-    struct list child_list;
+   struct list_elem child;  // 자식 스레드 리스트의 요소
+   struct list child_list;  // 자식 스레드 리스트
 
-    
-    // ✅✅✅✅✅ - exec에서 부모가 자식의 load() 완료까지 대기
-    struct semaphore s_load;
+   struct semaphore s_load;  // exec에서 부모가 자식의 load() 완료까지 대기
+   bool is_load;  // 자식의 load 성공 여부를 부모에게 전달ㄴ
 
-   // ✅✅✅✅✅ - wait()에서 부모가 자식의 종료를 대기
-   struct semaphore s_wait;
+   struct semaphore s_wait;  // wait()에서 부모가 자식의 종료를 대기
+   bool is_wait;  // 중복 wait 호출 방지용 플래그
 
-   // ✅✅✅✅✅ - 중복 wait 호출 방지용 플래그
-   bool is_wait;
-
-    // ✅✅✅✅✅ - 자식의 load 성공 여부를 부모에게 전달
-    bool is_load;
-
-    // ✅✅✅✅✅ - 실행 중인 파일에 대한 포인터, 쓰기 방지
-    struct file *cur_file;
+   struct file *cur_file;  // 실행 중인 파일에 대한 포인터, 쓰기 방지
+   // ✅✅✅✅✅
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */

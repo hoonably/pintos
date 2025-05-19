@@ -567,13 +567,12 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
   list_push_back (&all_list, &t->allelem);
 
-  // ✅✅✅✅✅ - child 리스트 요소 초기화
+  // ✅✅✅✅✅ - 초기화
   list_init(&t->child_list);
   sema_init(&t->s_load, 0);
   sema_init(&t->s_wait, 0);
   t->is_wait = false;
   t->is_load = false;
-  // ✅✅✅✅✅ 
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
