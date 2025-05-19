@@ -207,7 +207,7 @@ and its memory is freed in `thread_schedule_tail()` if `is_wait` is true.
 
 - We kept the default identity mapping between `tid_t` and `pid_t`, as it was sufficient for all required operations. 
 - Since each thread has a unique `tid`, and we only needed basic parent-child process tracking,
-introducing a separate mapping would have added unnecessary complexity without benefit.
+ introducing a separate mapping would have added unnecessary complexity without benefit.
 - If we had changed the mapping (e.g., to avoid PID reuse or support real process group IDs), 
 it could improve abstraction and security. But for Pintos, identity mapping is simple, efficient, and enough.
 
@@ -243,10 +243,10 @@ the quarter.
 
 +----------------------------+---------------------------------+
 
-| Jeonghoon Park             |  50%, Implemented system calls
+| Jeonghoon Park             |  50%, Implemented read, write, exec, wait, filesize / exception.c / pass multi-oom 
 
 +----------------------------+---------------------------------+
 
-| Deokhyeon Kim              |  50%, Implemented argument passing
+| Deokhyeon Kim              |  50%, Implemented remove, seek, tell / Finalization and fixes the previous code part
 
 +----------------------------+---------------------------------+
