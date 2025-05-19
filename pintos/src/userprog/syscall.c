@@ -411,6 +411,7 @@ int write(int fd, const void *buffer, unsigned size) {
   if (f == NULL) return -1;
 
   // 파일에 출력
+  struct file *cur_file = thread_current()->cur_file;
   lock_acquire(&file_lock);
   int bytes_write = file_write(f, buffer, size);
   lock_release(&file_lock);
