@@ -191,18 +191,39 @@ Deokhyeon Kim <ejrgus1404@unist.ac.kr>
 >> terminates without waiting, before C exits?  After C exits?  Are
 >> there any special cases?
 
-  - We use a `s_wait` semaphore and `is_wait` flag to synchronize the wait-exit interaction and avoid race conditions. 
-  - If the parent calls `wait()` before the child exits, it blocks on `s_wait` until the child signals completion via `sema_up()` in `process_exit()`. 
-  - If the child exits first, the exit status is saved in `is_exit`, 
-  and `s_wait` ensures the parent can still retrieve the result later when it calls `wait()`.
-  - The `is_wait` flag also prevents multiple `wait()` calls on the same child. 
-  - Once the exit status is collected, the child is removed from the `child_list`, 
-  and its memory is freed in `thread_schedule_tail()` if `is_wait` is true.
-  - If the parent exits without ever calling `wait()`, the child proceeds normally and exits on its own. 
-  - However, in this case, its memory is not freed because `is_wait` is never set. This leads to a potential memory leak.
-  - We chose this design for simplicity and correctness, and it passes all test cases. 
-  - In a production-grade OS, we would add a reference count or orphan cleanup mechanism to free such resources.
-  - This design ensures correct synchronization and cleanup in most cases, and avoids race conditions and use-after-free errors.
+    - When parent P calls wait(C) before child C exits:
+    We use a semaphore s_wait to synchronize between the parent and child.
+    If the parent calls wait(C) before the child exits, it blocks by calling sema_down(&child->s_wait).
+    When the child later calls exit(), it signals the parent by invoking sema_up(&s_wait), 
+    allowing the parent to resume and retrieve the child’s exit status via is_exit.
+    The is_wait flag is then set to true to prevent duplicate waits, and the child is removed from the child_list.
+
+    - When parent P calls wait(C) after child C has already exited:
+    If the child exits before the parent calls wait(C), it stores its exit status in is_exit and signals via s_wait.
+    When the parent eventually calls wait(C), it immediately returns with the stored status since the semaphore has already been signaled.
+    is_wait is set to prevent future waits, and the child is removed from the list.
+
+    - Ensuring that all resources are freed in each case:
+    All open files in the child are closed in process_exit(), including the running executable via file_close(cur_file).
+    If the parent successfully calls wait(C), the child’s memory (its struct thread) is freed in thread_schedule_tail() when is_wait == true.
+    This guarantees that both file descriptors and thread memory are released properly.
+
+    - When parent P terminates without waiting, before child C exits:
+    If the parent exits before calling wait(C), the child still runs and eventually calls exit() on its own.
+    However, since is_wait remains false, the child’s thread structure is never freed, resulting in a memory leak.
+    This behavior is permitted under Project 2’s scope, but would require additional mechanisms like reference counting in a full OS.
+
+    - When parent P terminates without waiting, after child C exits:
+    Similar to case 4, if the child has already exited and the parent never calls wait(), 
+    the child’s exit status remains stored, but is_wait is never set.
+    Thus, the child’s memory is not freed and leaks.
+    Again, this case is allowed in Pintos but could be addressed more thoroughly in later projects.
+
+    - Special cases and protection:
+    Multiple wait() calls on the same child are prevented via is_wait.
+    get_child() ensures only direct children can be waited on. grandchild processes are not eligible.
+    If the child does not exist or has already been waited on, process_wait() returns -1.
+
 
 ---- RATIONALE ----
 
