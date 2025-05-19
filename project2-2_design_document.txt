@@ -77,6 +77,7 @@ Deokhyeon Kim <ejrgus1404@unist.ac.kr>
     - typedef int pid_t; → process ID type for exec and wait
     - int fd_idx; → next file discripter index
     - struct file *fd_table[FD_MAX]; → file discripter table (FD_MAX=128 setting now)
+    - struct file *cur_file; → field in "struct thread" for tracking current executing file.
 
 >> B2: Describe how file descriptors are associated with open files.
 >> Are file descriptors unique within the entire OS or just within a
@@ -89,6 +90,15 @@ Deokhyeon Kim <ejrgus1404@unist.ac.kr>
 
 >> B3: Describe your code for reading and writing user data from the
 >> kernel.
+
+    Reading:
+        - If fd (file descriptor) is 0, then read characters to buffer from console.
+        - If fd is invalid or the file indicated by fd is invalid, then return -1.
+        - Read contents of the file. To avoid race condition, we utilize lock here.
+    Writing:
+        - If fd (file descriptor) is 1, then print characters in buffer at console.
+        - If fd is invalid or the file indicated by fd is invalid, then return -1.
+        - Write contents to the file. To avoid race condition, we utilize lock here.
 
 >> B4: Suppose a system call causes a full page (4,096 bytes) of data
 >> to be copied from user space into the kernel.  What is the least
