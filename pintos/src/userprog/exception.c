@@ -4,8 +4,8 @@
 #include "userprog/gdt.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
-#include "threads/vaddr.h"  // ✅✅✅✅✅ is_user_vaddr() 사용
-#include "userprog/syscall.h"  // ✅✅✅✅✅ exit() 사용
+#include "threads/vaddr.h"  // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ is_user_vaddr() 사용
+#include "userprog/syscall.h"  // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ exit() 사용
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -150,7 +150,7 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-   // ✅✅✅✅✅ 유저 영역 접근에서 kernel addr 접근 or unmapped 접근
+   // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ 유저 영역 접근에서 kernel addr 접근 or unmapped 접근
    // -> exit(-1)을 호출해서 kill하지 않고 정상적으로 프로세스 종료
    if (user && (!is_user_vaddr(fault_addr) || not_present)) {
       exit(-1);

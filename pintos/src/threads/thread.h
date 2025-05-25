@@ -4,7 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
-#include "synch.h"  // ✅✅✅✅✅ - semaphores (sema_init, sema_down, sema_up...)
+#include "synch.h"  // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - semaphores (sema_init, sema_down, sema_up...)
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -106,7 +106,7 @@ struct thread
     int fd_idx;  // 0 = stdin, 1 = stdout, 2 = file descriptor 시작
     struct file *fd_table[FD_MAX];  // fd_table[0] = stdin, fd_table[1] = stdout
 
-   // ✅✅✅✅✅ - 새로운 thread 구조체 변수
+   // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - 새로운 thread 구조체 변수
    struct thread *parent;  // 부모 스레드
 
    struct list_elem child;  // 자식 스레드 리스트의 요소
@@ -119,7 +119,7 @@ struct thread
    bool is_wait;  // 중복 wait 호출 방지용 플래그
 
    struct file *cur_file;  // 실행 중인 파일에 대한 포인터, 쓰기 방지
-   // ✅✅✅✅✅
+   // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -143,7 +143,7 @@ void thread_print_stats (void);
 
 typedef void thread_func (void *aux);
 tid_t thread_create (const char *name, int priority, thread_func *, void *);
-struct thread *get_child (tid_t tid);// ✅✅✅✅✅
+struct thread *get_child (tid_t tid);// Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️
 
 void thread_sleep (int64_t ticks);  // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️
 void thread_wake_up (int64_t ticks);  // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️

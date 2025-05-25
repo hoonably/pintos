@@ -192,8 +192,8 @@ thread_create (const char *name, int priority,
   t->fd_idx = 2;  // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - fd_table index 초기화
   memset(t->fd_table, 0, sizeof(t->fd_table)); // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - fd_table 초기화
 
-  t->parent = thread_current();  // ✅✅✅✅✅ - 자식의 parent 설정
-  list_push_back(&thread_current()->child_list, &t->child);  // ✅✅✅✅✅ - 자식 프로세스 리스트에 추가
+  t->parent = thread_current();  // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - 자식의 parent 설정
+  list_push_back(&thread_current()->child_list, &t->child);  // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - 자식 프로세스 리스트에 추가
 
   /* Prepare thread for first run by initializing its stack.
      Do this atomically so intermediate values for the 'stack' 
@@ -239,7 +239,7 @@ thread_block (void)
   schedule ();
 }
 
-// ✅✅✅✅✅
+// Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️
 // 현재 스레드의 child_list 안에서 tid인 자식 프로세스를 찾아 리턴
 struct thread *get_child(tid_t tid) {
   struct list_elem *e;
@@ -567,7 +567,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
   list_push_back (&all_list, &t->allelem);
 
-  // ✅✅✅✅✅ - 초기화
+  // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - 초기화
   list_init(&t->child_list);
   sema_init(&t->s_load, 0);
   sema_init(&t->s_wait, 0);
@@ -644,7 +644,7 @@ thread_schedule_tail (struct thread *prev)
   if (prev != NULL && prev->status == THREAD_DYING && prev != initial_thread) 
     {
       ASSERT (prev != cur);
-      // ✅✅✅✅✅ prev->is_wait가 true(부모가 wait 호출 후 설정)일 때만 해제
+      // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ prev->is_wait가 true(부모가 wait 호출 후 설정)일 때만 해제
       if (prev->is_wait == true)
         palloc_free_page (prev);
     }
