@@ -21,6 +21,7 @@
 struct lock file_lock;
 
 static void syscall_handler (struct intr_frame *);
+bool is_valid_buffer(const void* buffer, unsigned size);
 
 // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️
 // 미리 포인터를 검사하고 쓰기
@@ -51,12 +52,12 @@ static int get_user(const uint8_t *uaddr) {
 /* Writes BYTE to user address UDST.
    UDST must be below PHYS_BASE.
    Returns true if successful, false if a segfault occurred. */
-static bool put_user(uint8_t *udst, uint8_t byte) {
-  if (!is_valid_user_ptr(udst))
-      return false;
-  *udst = byte;
-  return true;
-}
+// static bool put_user(uint8_t *udst, uint8_t byte) {
+//   if (!is_valid_user_ptr(udst))
+//       return false;
+//   *udst = byte;
+//   return true;
+// }
 
 
 // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️
@@ -370,7 +371,7 @@ int read(int fd, void *buffer, unsigned size) {
 
   // fd == 0: 표준입력
   if (fd == 0) {
-    int i;
+    unsigned i;
     for (i = 0; i < size; i++) {
       // device/input.c의 input_getc()를 사용해서 키보드 입력을 받음
       ((char *)buffer)[i] = input_getc();  // 한 글자씩
@@ -411,7 +412,7 @@ int write(int fd, const void *buffer, unsigned size) {
   if (f == NULL) return -1;
 
   // 파일에 출력
-  struct file *cur_file = thread_current()->cur_file;
+  // struct file *cur_file = thread_current()->cur_file;
   lock_acquire(&file_lock);
   int bytes_write = file_write(f, buffer, size);
   lock_release(&file_lock);
