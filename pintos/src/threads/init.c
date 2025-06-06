@@ -37,6 +37,9 @@
 #include "filesys/filesys.h"
 #include "filesys/fsutil.h"
 #endif
+//! frame
+#include "vm/frame.h"
+
 
 /* Page directory with kernel mappings only. */
 uint32_t *init_page_dir;
@@ -100,9 +103,11 @@ main (void)
   paging_init ();
 
   /* Segmentation. */
+  //! frame table도 init
 #ifdef USERPROG
   tss_init ();
   gdt_init ();
+  frame_table_init();
 #endif
 
   /* Initialize interrupt handlers. */

@@ -18,6 +18,8 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "devices/timer.h"
+//! include에 frame 추가
+#include "vm/frame.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -326,6 +328,12 @@ load (const char *file_name, void (**eip) (void), void **esp)
       goto done; 
     }
 
+  //! 독립적 file 객체 복제
+  // file 객체가 여러 프로세스에서 공유되면 
+  // file_deny_write를 file_allow_write보다 많이 할 수 있어서 cnt가 음수가 되면 PANIC 발생함.
+  // file 객체를 복사하면 안전하게 파일 공유 가능
+  file = file_reopen(file);
+
   // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - 현재 실행중인 파일에 쓰기 금지
   t->cur_file = file;
   file_deny_write(t->cur_file);
@@ -499,7 +507,9 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
       /* Get a page of memory. */
-      uint8_t *kpage = palloc_get_page (PAL_USER);
+      //! kernel page니까 frame으로 alloc
+      // uint8_t *kpage = palloc_get_page (PAL_USER);
+      uint8_t *kpage = frame_alloc(PAL_USER, upage);
       if (kpage == NULL)
         return false;
 
@@ -514,7 +524,9 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       /* Add the page to the process's address space. */
       if (!install_page (upage, kpage, writable)) 
         {
-          palloc_free_page (kpage);
+          //! kernel page frame으로 만들었으니 frame free
+          // palloc_free_page (kpage);
+          frame_free(kpage);
           return false; 
         }
 
@@ -534,7 +546,9 @@ setup_stack (void **esp)
   uint8_t *kpage;
   bool success = false;
 
-  kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+  //! kernel page니까 frame alloc으로
+  // kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+  kpage = frame_alloc(PAL_USER | PAL_ZERO, ((uint8_t *) PHYS_BASE) - PGSIZE);
   if (kpage != NULL) 
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
