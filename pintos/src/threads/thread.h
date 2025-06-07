@@ -4,7 +4,9 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
-#include "synch.h"  // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - semaphores (sema_init, sema_down, sema_up...)
+#include "synch.h"  //* semaphores (sema_init, sema_down, sema_up...)
+//! Project 3
+#include <hash.h>
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -25,7 +27,7 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
-#define FD_MAX 256  // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - file descriptor 최대 개수 (palloc으로 하려면 나중에 수정하면 됨.)
+#define FD_MAX 256  //* file descriptor 최대 개수 (palloc으로 하려면 나중에 수정하면 됨.)
 
 /* A kernel thread or user process.
 
@@ -90,40 +92,37 @@ struct thread
     enum thread_status status;          /* Thread state. */
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
-    // ⭐️⭐️⭐️⭐️⭐️ - 스레드의 우선순위 (0~63), 높은 숫자가 높은 우선순위
-    int priority;                       /* Priority. */
+    int priority;                       /* Priority. */  //* 스레드의 우선순위 (0~63), 높은 숫자가 높은 우선순위
     struct list_elem allelem;           /* List element for all threads list. */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
-    // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - 스레드 깨어나야 할 시간
-    int64_t wake_up_ticks;
 
-    // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - 자식 프로세스의 종료 상태
-    int is_exit;  // 0 = 성공, 0이 아닌 값 = 실패
+    //* Project 1
+    int64_t wake_up_ticks;  // 스레드 깨어나야 할 시간
+    
+    //* Project 2
+    struct thread *parent;  // 부모 스레드
+    struct list_elem child;  // 자식 스레드 리스트의 요소
+    struct list child_list;  // 자식 스레드 리스트
+    int is_exit;  // 자식 프로세스의 종료 상태 / 0 = 성공, 0이 아닌 값 = 실패
 
-    // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - File Discripter Table
+    struct semaphore s_load;  // exec에서 부모가 자식의 load() 완료까지 대기
+    bool is_load;  // 자식의 load 성공 여부를 부모에게 전달ㄴ
+    struct semaphore s_wait;  // wait()에서 부모가 자식의 종료를 대기
+    bool is_wait;  // 중복 wait 호출 방지용 플래그
+    
     int fd_idx;  // 0 = stdin, 1 = stdout, 2 = file descriptor 시작
     struct file *fd_table[FD_MAX];  // fd_table[0] = stdin, fd_table[1] = stdout
+    struct file *cur_file;  // 실행 중인 파일에 대한 포인터, 쓰기 방지
 
-   // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - 새로운 thread 구조체 변수
-   struct thread *parent;  // 부모 스레드
+   //! Project 3
+   struct hash page_table;  // 보조 페이지 테이블 (SPT)
 
-   struct list_elem child;  // 자식 스레드 리스트의 요소
-   struct list child_list;  // 자식 스레드 리스트
-
-   struct semaphore s_load;  // exec에서 부모가 자식의 load() 완료까지 대기
-   bool is_load;  // 자식의 load 성공 여부를 부모에게 전달ㄴ
-
-   struct semaphore s_wait;  // wait()에서 부모가 자식의 종료를 대기
-   bool is_wait;  // 중복 wait 호출 방지용 플래그
-
-   struct file *cur_file;  // 실행 중인 파일에 대한 포인터, 쓰기 방지
-   // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️
-
+   // ifdef 때문에 자꾸 VSCode에서 오류떠서 위로 올림
+    uint32_t *pagedir;                  /* Page directory. */
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
-    uint32_t *pagedir;                  /* Page directory. */
     #endif
 
     /* Owned by thread.c. */
