@@ -6,6 +6,7 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"  // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ is_user_vaddr() 사용
 #include "userprog/syscall.h"  // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ exit() 사용
+#include "vm/page.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -149,21 +150,69 @@ page_fault (struct intr_frame *f)
   not_present = (f->error_code & PF_P) == 0;
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
+   //! #define PF_P 0x1
+   // 0: 페이지가 존재하지 않음 (not-present page) / 1: 페이지 접근 권한 위반 (access rights violation)
+   //* 근데 not_present = (f->error_code & PF_P) == 0; 니까 true가 페이지 존재 안하는거임
+   //! #define PF_W 0x2    /* 0: read, 1: write. */
+   // 0: 읽기 접근 / 1: 쓰기 접근
+   //! #define PF_U 0x4    /* 0: kernel, 1: user process. */
+   // 0: kernel 접근 / 1: 유저 프로세스 접근
 
    // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ 유저 영역 접근에서 kernel addr 접근 or unmapped 접근
    // -> exit(-1)을 호출해서 kill하지 않고 정상적으로 프로세스 종료
-   if (user && (!is_user_vaddr(fault_addr) || not_present)) {
-      exit(-1);
-   }
+//    if (user && (!is_user_vaddr(fault_addr) || not_present)) {
+//       exit(-1);
+//    }
 
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
-  printf ("Page fault at %p: %s error %s page in %s context.\n",
-          fault_addr,
-          not_present ? "not present" : "rights violation",
-          write ? "writing" : "reading",
-          user ? "user" : "kernel");
-  kill (f);
-}
 
+  //? DEBUG
+//   printf ("✅ Page fault at %p: %s error %s page in %s context.\n",
+//           fault_addr,
+//           not_present ? "not present" : "rights violation",
+//           write ? "writing" : "reading",
+//           user ? "user" : "kernel");
+//   kill (f);
+
+    void *upage = pg_round_down(fault_addr);
+
+    // 유저 영역 접근 아닌 경우 무조건 종료
+    if (!is_user_vaddr(upage)) {
+        exit(-1);
+    }
+
+    struct page *p = find_page_entry(&thread_current()->page_table, upage);
+
+    //! Stack Grow
+    if (p == NULL) {
+        // fault_addr 범위가 Growable Stack 영역인가?
+        void *esp = f->esp;
+        if ((uint8_t *)fault_addr >= (uint8_t *)esp - 32 &&
+            (uint8_t *)fault_addr >= (uint8_t *)PHYS_BASE - 0x800000) {
+
+            // 새로 stack 페이지 할당
+            if (!allocate_page(PAGE_STACK, upage, true)) {
+                exit(-1);
+            }
+
+            p = find_page_entry(&thread_current()->page_table, upage);
+            if (p == NULL) {
+                exit(-1);
+            }
+        } else {
+            exit(-1);
+        }
+    }
+
+    // read-only인데 write
+    if (!p->writable && write) {
+        exit(-1);
+    }
+
+    // 실제 페이지 로딩
+    if (!load_page(p)) {
+        exit(-1);
+    }
+}

@@ -20,6 +20,7 @@
 #include "devices/timer.h"
 //! include에 frame 추가
 #include "vm/frame.h"
+#include "vm/page.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -314,6 +315,9 @@ load (const char *file_name, void (**eip) (void), void **esp)
   bool success = false;
   int i;
 
+  //! page 테이블 초기화
+  page_table_init(&t->page_table);
+
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
   if (t->pagedir == NULL) 
@@ -506,34 +510,49 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
+      //! Page table entry 생성 및 등록
+      if (!allocate_page(PAGE_BINARY, upage, writable))
+          return false;
+
+      struct page *p = find_page_entry(&thread_current()->page_table, upage);
+      if (p == NULL) return false;
+
+      //! 파일 매핑 정보 저장
+      p->file = file;
+      p->offset = ofs;
+      p->read_bytes = page_read_bytes;
+      p->zero_bytes = page_zero_bytes;
+
       /* Get a page of memory. */
-      //! kernel page니까 frame으로 alloc
+      //* kernel page니까 frame으로 alloc
       // uint8_t *kpage = palloc_get_page (PAL_USER);
-      uint8_t *kpage = frame_alloc(PAL_USER, upage);
-      if (kpage == NULL)
-        return false;
+      // uint8_t *kpage = frame_alloc(PAL_USER, upage);
+      // if (kpage == NULL)
+      //   return false;
 
-      /* Load this page. */
-      if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
-        {
-          palloc_free_page (kpage);
-          return false; 
-        }
-      memset (kpage + page_read_bytes, 0, page_zero_bytes);
+      // /* Load this page. */
+      // if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
+      //   {
+      //     palloc_free_page (kpage);
+      //     return false; 
+      //   }
+      // memset (kpage + page_read_bytes, 0, page_zero_bytes);
 
-      /* Add the page to the process's address space. */
-      if (!install_page (upage, kpage, writable)) 
-        {
-          //! kernel page frame으로 만들었으니 frame free
-          // palloc_free_page (kpage);
-          frame_free(kpage);
-          return false; 
-        }
+      // /* Add the page to the process's address space. */
+      // if (!install_page (upage, kpage, writable)) 
+      //   {
+      //     // kernel page frame으로 만들었으니 frame free
+      //     // palloc_free_page (kpage);
+      //     frame_free(kpage);
+      //     return false; 
+      //   }
 
       /* Advance. */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
       upage += PGSIZE;
+      //! ofs는 파일 오프셋이니까 읽은 만큼 증가시켜야 함
+      ofs += page_read_bytes;
     }
   return true;
 }
