@@ -42,6 +42,8 @@
         "stdexcept": "cpp",
         "system_error": "cpp",
         "boundary.h": "c",
-        "*.inc": "c"
+        "*.inc": "c",
+        "filesys.h": "c",
+        "stdlib.h": "c"
     }
 }
