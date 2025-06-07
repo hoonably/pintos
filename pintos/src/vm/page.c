@@ -54,19 +54,19 @@ page 기반 : 개별 가상 페이지 단위로 구성
 
 */
 
-unsigned vm_hash_func(const struct hash_elem *e, void *aux UNUSED) {
+unsigned page_hash_func(const struct hash_elem *e, void *aux UNUSED) {
     struct page *vme = hash_entry(e, struct page, elem);
     return hash_bytes(&vme->vaddr, sizeof(vme->vaddr));
 }
 
-bool vm_less_func(const struct hash_elem *a, const struct hash_elem *b, void *aux UNUSED) {
+bool page_less_func(const struct hash_elem *a, const struct hash_elem *b, void *aux UNUSED) {
     struct page *vma = hash_entry(a, struct page, elem);
     struct page *vmb = hash_entry(b, struct page, elem);
     return vma->vaddr < vmb->vaddr;
 }
 
 void page_table_init(struct hash *page_table) {
-    hash_init(page_table, vm_hash_func, vm_less_func, NULL);
+    hash_init(page_table, page_hash_func, page_less_func, NULL);
 }
 
 bool insert_page_entry(struct hash *page_table, struct page *vme) {
