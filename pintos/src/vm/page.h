@@ -23,7 +23,7 @@ PHYS_BASE 0xc0000000 (3 GB) 아래에 User page가 생성됨
 */
 
 // binary(text, data), file (mmap), 그 외 (stack, swap)
-enum page_type { PAGE_BINARY, PAGE_MMAP, PAGE_STACK };
+enum page_type { PAGE_BINARY, PAGE_MMAP, PAGE_STACK, PAGE_SWAP };
 
 struct page {
     uint8_t *vaddr;  // fault된 가상 주소
@@ -37,6 +37,8 @@ struct page {
     size_t zero_bytes;
 
     struct hash_elem elem;       // 해시 테이블용
+
+    int swap_slot;
 };
 
 void page_table_init(struct hash *page_table);

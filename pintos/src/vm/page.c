@@ -92,6 +92,7 @@ bool allocate_page(enum page_type type, void *vaddr, bool writable) {
     vme->writable = writable;
     vme->is_loaded = false;
     vme->type = type;
+    vme->swap_slot = -1;
 
     // file, offset 등은 이후 load_segment에서 설정
 
@@ -111,7 +112,15 @@ bool load_page(struct page *vme) {
         return false;
 
     // 2. backing store에서 읽기
-    if (vme->type == PAGE_MMAP || vme->type == PAGE_BINARY) {
+    if (vme->type == PAGE_SWAP) {
+        if (!swap_in(vme->swap_slot, kpage)) {
+            frame_free(kpage);
+            return false;
+        }
+        swap_free(vme->swap_slot);  /* 읽어온 뒤 슬롯 해제 */
+        vme->swap_slot = -1;
+    }
+    else if (vme->type == PAGE_MMAP || vme->type == PAGE_BINARY) {
         if (file_read_at(vme->file, kpage, vme->read_bytes, vme->offset) != (int)vme->read_bytes) {
             frame_free(kpage);
             return false;

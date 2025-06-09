@@ -39,6 +39,8 @@
 #endif
 //! frame
 #include "vm/frame.h"
+//! swap
+#include "vm/swap.h"
 
 
 /* Page directory with kernel mappings only. */
@@ -130,6 +132,11 @@ main (void)
   ide_init ();
   locate_block_devices ();
   filesys_init (format_filesys);
+#endif
+
+//! swap init
+#ifdef VM
+  swap_init();
 #endif
 
   printf ("Boot complete.\n");

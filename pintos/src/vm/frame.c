@@ -1,24 +1,42 @@
 #include "vm/frame.h"
 #include "threads/malloc.h"  // malloc(), free()
 #include "threads/synch.h"   // lock
-
-/*
-! 현재 frame table만 구현했고, 이 상태로 Project 2 테스트는 전부 통과함
-
-TODO: Eviction (페이지 교체 정책)
-- 현재는 물리 프레임이 부족하면 NULL을 반환
-- 이후에는 eviction policy를 기반으로 victim frame을 선택하고 해당 페이지를 저장하고 해당 frame을 재할당
-- page replacement 정책 = LRU 또는 Second-Chance
-- accessed bit, dirty bit 이용
-
-TODO: Swap 연동
-- swap.c 구현 이후, evicted page는 swap 영역으로 저장 필요
-- 저장된 페이지는 SPT(보조 페이지 테이블)를 통해 참조 가능해야 함
-*/
-
+#include "userprog/pagedir.h"
+#include "vm/swap.h"
+#include "vm/page.h"
 
 static struct list frame_list;
 static struct lock frame_lock;
+
+//! 스왑·클록 교체 알고리즘
+static void *frame_evict_and_reuse(void *upage) {
+    struct list_elem *e;
+    for (;;) {
+        for (e = list_begin(&frame_list);
+             e != list_end(&frame_list);
+             e = list_next(e)) {
+            struct frame *victim = list_entry(e, struct frame, elem);
+            if (!pagedir_is_accessed(victim->thread->pagedir, victim->upage)) {
+                pagedir_clear_page(victim->thread->pagedir, victim->upage);
+                if (pagedir_is_dirty(victim->thread->pagedir, victim->upage)) {
+                    size_t slot;
+                    swap_out(victim->kpage, &slot);
+                    struct page *vme = find_page_entry(
+                        &victim->thread->page_table, victim->upage);
+                    vme->swap_slot = (int)slot;
+                    vme->type      = PAGE_SWAP;
+                    vme->is_loaded = false;
+                }
+                void *k = victim->kpage;
+                list_remove(&victim->elem);
+                free(victim);
+                return k;
+            }
+            pagedir_set_accessed(
+                victim->thread->pagedir, victim->upage, false);
+        }
+    }
+}
 
 void frame_table_init(void) {
     // 전역변수 초기화
@@ -40,14 +58,11 @@ void *frame_alloc(enum palloc_flags flags, void *upage) {
     void *kpage = palloc_get_page(flags);
     if (kpage == NULL) {
         lock_release(&frame_lock);
-
-        // TODO: frame이 부족할 경우 eviction 정책 적용
-        // 1. frame_list에서 victim 선택 (accessed/dirty bit 기반)
-        // 2. 해당 페이지를 swap 또는 파일에 저장
-        // 3. 해당 frame을 재할당
-        
-        // 지금은 swap과 eviction 미구현 상태라 NULL 반환하고 그냥 끝
-        return NULL;
+        //! frame이 부족할 경우 eviction 정책 적용
+        kpage = frame_evict_and_reuse(upage);
+        if (!kpage)
+            return NULL;
+        lock_acquire(&frame_lock);
     }
 
     // frame 메타데이터 동적 생성
@@ -75,16 +90,19 @@ void frame_free(void *kpage) {
 
     // frame_list에서 찾는 kpage 가진 frame 찾아서 해제
     struct list_elem *e;
-    for (e = list_begin(&frame_list); e != list_end(&frame_list); e = list_next(e)) {
+    for (e = list_begin(&frame_list);
+             e != list_end(&frame_list);
+             e = list_next(e)) {
         struct frame *f = list_entry(e, struct frame, elem);
         if (f->kpage == kpage) {
-            // TODO: swap 연동시 swap slot 해제
-
-            // TODO: supplemental page table 지우기
-
+            /* ① 보조 페이지 테이블에서 대응 vme 찾기 */
+            struct page *vme = find_page_entry(&f->thread->page_table, f->upage);
+            /* ② 스왑 슬롯에 올라가 있으면 해제 */
+            if (vme != NULL && vme->type == PAGE_SWAP && vme->swap_slot >= 0)
+                swap_free((size_t)vme->swap_slot);
 
             list_remove(&f->elem);
-            free(f);  // 메타데이터 해제
+            free(f);
             palloc_free_page(kpage);
             break;
         }

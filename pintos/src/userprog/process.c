@@ -32,7 +32,7 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 tid_t
 process_execute (const char *file_name) 
 {
-  char *fn_copy, *fn_parse, args;
+  char *fn_copy, *fn_parse, *args;
   tid_t tid;
 
   fn_copy = palloc_get_page(0);
