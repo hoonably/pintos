@@ -6,6 +6,8 @@
 #include "threads/vaddr.h"
 #include "filesys/off_t.h"
 
+#define STACK_MAX_SIZE 0x800000  // 8 MB 스택 성장 크기
+
 /*
 page = 4096 bytes의 연속적인 virtual memory 영역
 시작주소도 꼭 page size로 나누어 떨어져야 함
@@ -36,10 +38,20 @@ struct page {
     size_t read_bytes;
     size_t zero_bytes;
 
-    struct hash_elem elem;       // 해시 테이블용
+    struct hash_elem elem;
 
     int swap_slot;
 };
+
+struct mmap_file {
+    mapid_t idx;
+    struct file *file;  // 매핑된 파일
+    void *addr;  // 시작 가상 주소
+    size_t length;  //* 전체 바이트 수
+    struct list_elem elem;
+};
+
+
 
 unsigned page_hash_func(const struct hash_elem *e, void *aux UNUSED);
 bool page_less_func(const struct hash_elem *a, const struct hash_elem *b, void *aux UNUSED);

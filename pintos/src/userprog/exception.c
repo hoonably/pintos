@@ -190,7 +190,7 @@ page_fault (struct intr_frame *f)
         // fault_addr 범위가 Growable Stack 영역인가?
         void *esp = f->esp;
         if ((uint8_t *)fault_addr >= (uint8_t *)esp - 32 &&
-            (uint8_t *)fault_addr >= (uint8_t *)PHYS_BASE - 0x800000) {
+            (uint8_t *)fault_addr >= (uint8_t *)PHYS_BASE - STACK_MAX_SIZE) {
 
             // 새로 stack 페이지 할당
             if (!allocate_page(PAGE_STACK, upage, true)) {

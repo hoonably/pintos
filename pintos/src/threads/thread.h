@@ -7,6 +7,7 @@
 #include "synch.h"  //* semaphores (sema_init, sema_down, sema_up...)
 //! Project 3
 #include <hash.h>
+typedef int mapid_t;  // 원래 user/syscall.h에 정의되어있는데 그거 불러오면 동일 함수명 에러남
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -118,6 +119,8 @@ struct thread
 
    //! Project 3
    struct hash page_table;  // 보조 페이지 테이블 (SPT)
+   struct list mmap_list;  // mmap_file 저장하는 리스트
+   mapid_t mmap_idx;
 
    // ifdef 때문에 자꾸 VSCode에서 오류떠서 위로 올림
     uint32_t *pagedir;                  /* Page directory. */

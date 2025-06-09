@@ -573,6 +573,10 @@ init_thread (struct thread *t, const char *name, int priority)
   sema_init(&t->s_wait, 0);
   t->is_wait = false;
   t->is_load = false;
+
+  //! Pintos 3 - MMap
+  list_init (&t->mmap_list);
+  t->mmap_idx = 0;
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and

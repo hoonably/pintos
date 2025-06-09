@@ -21,7 +21,6 @@
 // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - file 여러개 접근 방지 lock
 struct lock file_lock;
 
-static void syscall_handler (struct intr_frame *);
 bool is_valid_buffer(const void* buffer, unsigned size, bool writable); // 유효한 버퍼인지 검사
 
 // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️
@@ -240,6 +239,23 @@ syscall_handler (struct intr_frame *f UNUSED)
         break;
     }
 
+    //! MMAP
+    case SYS_MMAP: {
+        if (!is_user_vaddr(f->esp + 4) || !is_user_vaddr(f->esp + 8)) exit(-1);
+        int fd = *(int *)(f->esp + 4);
+        void *addr = *(void **)(f->esp + 8);
+        f->eax = syscall_mmap(fd, addr, f->esp);
+        break;
+    }
+
+    //! MUNMAP
+    // case SYS_MUNMAP: {
+    //     if (!is_user_vaddr(f->esp + 4)) exit(-1);
+    //     mapid_t idx = *(mapid_t *)(f->esp + 4);
+    //     syscall_munmap(idx);
+    //     break;
+    // }
+
     default:
       // 이상한 syscall 번호가 들어오면 종료
       printf("System call number error: %d\n", syscall_num);
@@ -356,7 +372,6 @@ bool is_valid_buffer(const void* buffer, unsigned size, bool writable) {
   char *start = (char *)pg_round_down(buffer);
   char *end = (char *)pg_round_down(buffer + size - 1);
   char *ptr;
-  struct thread *t = thread_current();
   //! round_down했기 때문에 end까지 검사해야 함 -? bad_ptr 검사 통과
   for(ptr = start; ptr <= end; ptr+= PGSIZE) {
     if (!is_user_vaddr(ptr)) return 0;
@@ -393,6 +408,9 @@ int read(int fd, void *buffer, unsigned size) {
 
   // file descriptor check & file check
   if (fd < 2 || fd >= FD_MAX) return -1;
+  //? DEBUG
+  // printf("🚨 READ fd=%d, buffer=%p, size=%u\n", fd, buffer, size);
+
   struct file *f = thread_current()->fd_table[fd];
   if (f == NULL) return -1;
 
@@ -421,6 +439,11 @@ int write(int fd, const void *buffer, unsigned size) {
 
   // file descriptor check & file check
   if (fd < 2 || fd >= FD_MAX) return -1;
+
+  //? DEBUG
+  // printf("🚨 WRITE fd=%d, buffer=%p, size=%u\n", fd, buffer, size);
+  // hex_dump((uintptr_t)buffer, buffer, 32, true);  // 앞부분만
+
   struct file *f = thread_current()->fd_table[fd];
   if (f == NULL) return -1;
 
@@ -457,4 +480,71 @@ void close(int fd) {
   struct thread *cur_thread = thread_current();
   file_close (cur_thread->fd_table[fd]);
   cur_thread->fd_table[fd] = NULL;
+}
+
+// MMAP
+mapid_t syscall_mmap(int fd, void *addr, void *esp) {
+    struct thread *t = thread_current();
+
+    if (fd <= 1 || addr == NULL || pg_ofs(addr) != 0)
+        return -1;
+
+    // mmap 주소가 현재 스택보다 위 or 스택 확장 가능한 영역과 겹치면 실패
+    if (addr >= esp || addr >= (PHYS_BASE - STACK_MAX_SIZE))
+        return -1;
+
+    // fd가 가리키는 열린 파일 가져오기
+    struct file *file = t->fd_table[fd];
+    if (file == NULL) return -1;
+
+    off_t length = file_length(file);
+    if (length == 0) return -1;  // 빈 파일 mmap X
+
+    // reopen으로 mmap 전용 file 객체 생성
+    file = file_reopen(file);
+    if (file == NULL) return -1;
+
+    struct mmap_file *mf = malloc(sizeof(struct mmap_file));
+    if (!mf) return -1;
+
+    mf->idx = t->mmap_idx++;
+    mf->file = file;
+    mf->addr = addr;
+    mf->length = length;
+    list_push_back(&t->mmap_list, &mf->elem);  // 리스트에 등록
+
+    // SPT에 lazy loading용 page 추가
+    off_t offset = 0;
+    void *page_addr = addr;
+
+    while (length > 0) {
+        size_t page_read_bytes = length < PGSIZE ? length : PGSIZE;
+        size_t page_zero_bytes = PGSIZE - page_read_bytes;
+
+        struct page *p = malloc(sizeof(struct page));
+        if (!p) return -1;
+
+        // 기본 페이지 정보 설정
+        p->vaddr = page_addr;
+        p->writable = true;  //! mmap은 원래 쓰기 가능
+        p->is_loaded = false;  // lazy loading
+        p->type = PAGE_MMAP;
+
+        // lazy loading 할거니까 파일 정보 저장
+        p->file = file;
+        p->offset = offset;
+        p->read_bytes = page_read_bytes;
+        p->zero_bytes = page_zero_bytes;
+
+        // SPT에 등록
+        if (!insert_page_entry(&t->page_table, p))
+            return -1;
+
+        // 다음 페이지로
+        page_addr += PGSIZE;
+        offset += page_read_bytes;
+        length -= page_read_bytes;
+    }
+
+    return mf->idx;
 }
