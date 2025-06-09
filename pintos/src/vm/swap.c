@@ -9,8 +9,9 @@ static struct lock swap_lock;
 static struct bitmap *swap_bitmap;
 static struct block *swap_block;
 
-/* 한 페이지를 구성하는 섹터 개수 */
-#define SECTORS_PER_PAGE (PGSIZE / BLOCK_SECTOR_SIZE)
+// 한 페이지를 구성하는 섹터 개수 : 페이지 크기(PGSIZE) / 블록 섹터 크기(BLOCK_SECTOR_SIZE)
+// PGSIZE는 4096 bytes, BLOCK_SECTOR_SIZE는 512 bytes
+#define SECTORS_PER_PAGE (PGSIZE / BLOCK_SECTOR_SIZE)  //! => 4096 / 512 = 8
 
 void
 swap_init(void) {

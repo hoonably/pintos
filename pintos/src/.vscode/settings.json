@@ -1,6 +1,0 @@
-{
-    "files.associations": {
-        "vaddr.h": "c",
-        "frame.h": "c"
-    }
-}

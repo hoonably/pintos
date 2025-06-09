@@ -1,4 +1,9 @@
 #include "vm/page.h"
+#include <string.h>
+#include "filesys/file.h"
+#include "userprog/pagedir.h"
+#include "threads/malloc.h"
+#include "vm/swap.h"
 
 /*
 ! Supplemental Page Table
@@ -117,7 +122,8 @@ bool load_page(struct page *vme) {
             frame_free(kpage);
             return false;
         }
-        swap_free(vme->swap_slot);  /* 읽어온 뒤 슬롯 해제 */
+        //! 읽어온 뒤 슬롯 해제
+        swap_free(vme->swap_slot);
         vme->swap_slot = -1;
     }
     else if (vme->type == PAGE_MMAP || vme->type == PAGE_BINARY) {

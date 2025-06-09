@@ -41,6 +41,8 @@ struct page {
     int swap_slot;
 };
 
+unsigned page_hash_func(const struct hash_elem *e, void *aux UNUSED);
+bool page_less_func(const struct hash_elem *a, const struct hash_elem *b, void *aux UNUSED);
 void page_table_init(struct hash *page_table);
 
 bool allocate_page(enum page_type type, void *vaddr, bool writable);
