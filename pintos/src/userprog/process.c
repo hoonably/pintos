@@ -553,11 +553,6 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       upage += PGSIZE;
       //! ofs는 파일 오프셋이니까 읽은 만큼 증가시켜야 함
       ofs += page_read_bytes;
-
-
-      // TODO: Eviction이 필요할 경우 처리해야 할 부분
-      // 만약 물리 메모리 부족 시, Eviction 정책을 적용하여 프레임을 선택하고 스왑에 저장
-      // 선택된 victim 페이지를 swap에 저장 후, 새 페이지를 로드
     }
   return true;
 }
@@ -572,6 +567,7 @@ setup_stack (void **esp)
 
   //! kernel page니까 frame alloc으로
   // kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+  // frame_alloc() 내부에서 eviction 처리됨
   kpage = frame_alloc(PAL_USER | PAL_ZERO, ((uint8_t *) PHYS_BASE) - PGSIZE);
   if (kpage != NULL) 
     {
@@ -582,10 +578,6 @@ setup_stack (void **esp)
         palloc_free_page (kpage);
     }
 
-
-  // TODO: Eviction 정책 적용
-  // 만약 스택 설정 시 페이지가 부족하면, Eviction을 적용하여 스택을 확장
-  // 새로운 스택 페이지를 할당하고 이전 페이지를 스왑에 저장하는 작업 필요
   return success;
 }
 

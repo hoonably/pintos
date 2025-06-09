@@ -201,10 +201,8 @@ page_fault (struct intr_frame *f)
             if (p == NULL) {
                 exit(-1);
             }
-        } else {
-            // TODO: Eviction = page_fault 시 물리 메모리 부족 -> victim 선택 후 해당 페이지를 swap에 저장
-            // 페이지 교체를 위한 정책을 선택하고, victim을 선택하여 해당 페이지를 swap에 저장
-            // 예: victim 페이지 선택, 해당 페이지 스왑 영역에 저장, 새 페이지 로드 등
+        } 
+        else {
             exit(-1);
         }
     }
@@ -218,8 +216,4 @@ page_fault (struct intr_frame *f)
     if (!load_page(p)) {
         exit(-1);
     }
-
-   // TODO: Swap 연동 (Eviction 시 해당 페이지를 스왑에 저장하고 복원)
-   // 페이지가 스왑 영역에 있을 경우, 이를 복원
-   // 예: swap 영역에서 페이지 읽어오기, 페이지 테이블 갱신 등
 }

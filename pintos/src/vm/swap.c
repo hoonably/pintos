@@ -25,9 +25,9 @@ swap_init(void) {
     PANIC("swap_init: bitmap_create failed");
 }
 
-/* kpage → 스왑 슬롯에 저장 */
+/* kpage 에 담긴 프레임을 스왑 슬롯에 내보내고, 할당된 슬롯 번호를 *slot 에 반환 */
 bool
-swap_out(const void *kpage, size_t *slot_) {
+swap_out(const void *kpage, size_t *slot) {
   lock_acquire(&swap_lock);
   size_t idx = bitmap_scan_and_flip(swap_bitmap, 0, 1, false);
   if (idx == BITMAP_ERROR) {
@@ -40,11 +40,11 @@ swap_out(const void *kpage, size_t *slot_) {
   for (i = 0; i < SECTORS_PER_PAGE; i++)
     block_write(swap_block, sector + i, buf + i * BLOCK_SECTOR_SIZE);
   lock_release(&swap_lock);
-  *slot_ = idx;
+  *slot = idx;
   return true;
 }
 
-/* 스왑 슬롯 → kpage 로 복원 */
+/* 스왑 slot 에서 읽어 kpage 에 복원 */
 bool
 swap_in(size_t slot, void *kpage) {
   if (slot == (size_t) -1 || !bitmap_test(swap_bitmap, slot))
@@ -60,7 +60,7 @@ swap_in(size_t slot, void *kpage) {
   return true;
 }
 
-/* 슬롯 해제 */
+/* 스왑 비트맵 해제 */
 void
 swap_free(size_t slot) {
   if (slot == (size_t)-1) return;

@@ -16,12 +16,13 @@
 // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ 입출력 관련 헤더
 #include "devices/input.h"
 #include "filesys/file.h"
+#include "vm/page.h"
 
 // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - file 여러개 접근 방지 lock
 struct lock file_lock;
 
 static void syscall_handler (struct intr_frame *);
-bool is_valid_buffer(const void* buffer, unsigned size);
+bool is_valid_buffer(const void* buffer, unsigned size, bool writable); // 유효한 버퍼인지 검사
 
 // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️
 // 미리 포인터를 검사하고 쓰기
@@ -348,18 +349,28 @@ int filesize(int fd) {
   return file_length(f);
 }
 
-// Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - buffer가 valid한지 확인
-bool is_valid_buffer(const void* buffer, unsigned size) {
+bool is_valid_buffer(const void* buffer, unsigned size, bool writable) {
   if(!buffer) return 0;
 
+  //! round down해서 페이지 단위로 검사로 변경 -> read_boundary 검사 통과
+  char *start = (char *)pg_round_down(buffer);
+  char *end = (char *)pg_round_down(buffer + size - 1);
   char *ptr;
   struct thread *t = thread_current();
-  for(ptr = (char *)buffer; ptr < (char *)buffer + size; ptr++) {
-    if(!is_user_vaddr(ptr)) return 0;
-    if(!pagedir_get_page(t->pagedir, ptr)) return 0;
+  //! round_down했기 때문에 end까지 검사해야 함 -? bad_ptr 검사 통과
+  for(ptr = start; ptr <= end; ptr+= PGSIZE) {
+    if (!is_user_vaddr(ptr)) return 0;
+    struct page *page = find_page_entry(&thread_current()->page_table, ptr);
+    if (page == NULL) {
+      //! lazyloding 허용 -> page_fault() 에서 결정해줌
+      // // return false;
+      continue;
+    }
+    if (writable && !page->writable) return false;
   }
   return 1;
 }
+
 
 // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️
 // fd로부터 size만큼 데이터를 읽어 buffer에 저장
@@ -367,7 +378,8 @@ bool is_valid_buffer(const void* buffer, unsigned size) {
 // 읽은 바이트 수 반환, 실패 시 -1
 int read(int fd, void *buffer, unsigned size) {
 
-  if(!is_valid_buffer(buffer, size)) exit(-1);
+  // 사용자로부터 buffer에 데이터를 쓰니까 writable == true
+  if(!is_valid_buffer(buffer, size, true)) exit(-1);
 
   // fd == 0: 표준입력
   if (fd == 0) {
@@ -397,8 +409,9 @@ int read(int fd, void *buffer, unsigned size) {
 // fd == 1이면 콘솔, 그 외에는 열린 파일에 기록
 // 실제로 쓴 바이트 수를 반환
 int write(int fd, const void *buffer, unsigned size) {
-  // buffer가 valid한지 확인
-  if(!is_valid_buffer(buffer, size)) exit(-1);
+
+  // 사용자로부터 buffer에 데이터를 읽으니까 writable == false
+  if(!is_valid_buffer(buffer, size, false)) exit(-1);
 
   // 콘솔에 출력
   if (fd == 1) {
