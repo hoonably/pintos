@@ -108,14 +108,16 @@ bool load_page(struct page *vme) {
     ASSERT(vme != NULL);
 
     //? DEBUG
-    printf("🔍 vaddr=%p type=%d file=%p read_bytes=%u zero_bytes=%u\n",
-       vme->vaddr, vme->type, vme->file, vme->read_bytes, vme->zero_bytes);
+    // printf("🔍 vaddr=%p type=%d file=%p read_bytes=%u zero_bytes=%u\n",
+    //    vme->vaddr, vme->type, vme->file, vme->read_bytes, vme->zero_bytes);
 
-
-    // 이미 로딩되어 있다면 성공 처리
-    if (vme->is_loaded)
-        return true;
-
+    struct thread *t = thread_current();
+    if (vme->is_loaded) {
+        void *actual = pagedir_get_page(t->pagedir, vme->vaddr);
+        if (actual != NULL) {
+            return true;
+        }
+    }
     // 1. frame 할당
     uint8_t *kpage = frame_alloc(PAL_USER, vme->vaddr);
     if (kpage == NULL)
@@ -144,7 +146,6 @@ bool load_page(struct page *vme) {
     }
 
     // 3. page table에 매핑
-    struct thread *t = thread_current();
     if (!pagedir_set_page(t->pagedir, vme->vaddr, kpage, vme->writable)) {
         frame_free(kpage);
         return false;

@@ -18,7 +18,7 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "devices/timer.h"
-//! include에 frame 추가
+#include "userprog/syscall.h"
 #include "vm/frame.h"
 #include "vm/page.h"
 
@@ -568,25 +568,23 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
-setup_stack (void **esp) 
+setup_stack(void **esp)
 {
-  uint8_t *kpage;
-  bool success = false;
+    void *upage = (uint8_t *) PHYS_BASE - PGSIZE;
 
-  //! kernel page니까 frame alloc으로
-  // kpage = palloc_get_page (PAL_USER | PAL_ZERO);
-  // frame_alloc() 내부에서 eviction 처리됨
-  kpage = frame_alloc(PAL_USER | PAL_ZERO, ((uint8_t *) PHYS_BASE) - PGSIZE);
-  if (kpage != NULL) 
-    {
-      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-      if (success)
-        *esp = PHYS_BASE;
-      else
-        palloc_free_page (kpage);
+    // frame 할당 시도 - lazy
+    if (!allocate_page(PAGE_STACK, upage, true)) {
+        return false;
     }
 
-  return success;
+    // 실제 페이지 로드 (기존 frame_alloc + install_page의 역할)
+    struct page *p = find_page_entry(&thread_current()->page_table, upage);
+    if (p == NULL || !load_page(p)) {
+        return false;
+    }
+
+    *esp = PHYS_BASE;
+    return true;
 }
 
 /* Adds a mapping from user virtual address UPAGE to kernel

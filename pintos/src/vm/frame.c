@@ -9,7 +9,7 @@ static struct list frame_list;
 static struct lock frame_lock;
 
 //! 스왑·클록 교체 알고리즘
-static void *frame_evict_and_reuse(void *upage) {
+static void *frame_evict_and_reuse() {
     struct list_elem *e;
     for (;;) {
         for (e = list_begin(&frame_list);
@@ -18,11 +18,13 @@ static void *frame_evict_and_reuse(void *upage) {
             struct frame *victim = list_entry(e, struct frame, elem);
             if (!pagedir_is_accessed(victim->thread->pagedir, victim->upage)) {
                 pagedir_clear_page(victim->thread->pagedir, victim->upage);
-                if (pagedir_is_dirty(victim->thread->pagedir, victim->upage)) {
-                    size_t slot;
-                    swap_out(victim->kpage, &slot);
-                    struct page *vme = find_page_entry(
+                size_t slot;
+                struct page *vme = find_page_entry(
                         &victim->thread->page_table, victim->upage);
+                
+                //! vme가 NULL이 아닐때만 swap_out
+                if (vme != NULL) {
+                    swap_out(victim->kpage, &slot);
                     vme->swap_slot = (int)slot;
                     vme->type      = PAGE_SWAP;
                     vme->is_loaded = false;
@@ -59,7 +61,7 @@ void *frame_alloc(enum palloc_flags flags, void *upage) {
     if (kpage == NULL) {
         lock_release(&frame_lock);
         //! frame이 부족할 경우 eviction 정책 적용
-        kpage = frame_evict_and_reuse(upage);
+        kpage = frame_evict_and_reuse();  // 안쓰는 변수라 그냥 뺌
         if (!kpage)
             return NULL;
         lock_acquire(&frame_lock);

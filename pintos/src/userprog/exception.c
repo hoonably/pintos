@@ -169,11 +169,11 @@ page_fault (struct intr_frame *f)
      which fault_addr refers. */
 
   //? DEBUG
-  printf ("✅ Page fault at %p: %s error %s page in %s context.\n",
-          fault_addr,
-          not_present ? "not present" : "rights violation",
-          write ? "writing" : "reading",
-          user ? "user" : "kernel");
+//   printf ("✅ Page fault at %p: %s error %s page in %s context.\n",
+//           fault_addr,
+//           not_present ? "not present" : "rights violation",
+//           write ? "writing" : "reading",
+//           user ? "user" : "kernel");
 //   kill (f);
 
     void *upage = pg_round_down(fault_addr);
@@ -181,7 +181,7 @@ page_fault (struct intr_frame *f)
     // 유저 영역 접근 아닌 경우 무조건 종료
     if (!is_user_vaddr(upage)) {
       //? DEBUG
-      printf("🚨 not user vaadr %p\n", upage);
+      // printf("🚨 not user vaadr %p\n", upage);
         exit(-1);
     }
 
@@ -202,26 +202,26 @@ page_fault (struct intr_frame *f)
 
         void *esp = user ? f->esp : thread_current()->user_esp;
         if ((uint8_t *)fault_addr >= (uint8_t *)esp - 32 &&
-            (uint8_t *)fault_addr >= (uint8_t *)PHYS_BASE - (uint8_t *)STACK_MAX_SIZE) {  
+            (uint8_t *)fault_addr >= (uint8_t *)PHYS_BASE - STACK_MAX_SIZE) {  
 
             // 새로 stack 페이지 할당
             if (!allocate_page(PAGE_STACK, upage, true)) {
                   //? DEBUG
-                  printf("🚨 allocate_page failed for stack page at %p\n", upage);
+                  // printf("🚨 allocate_page failed for stack page at %p\n", upage);
                 exit(-1);
             }
 
             p = find_page_entry(&thread_current()->page_table, upage);
             if (p == NULL) {
                //? DEBUG
-               printf("🚨 find_page_entry failed for stack page at %p\n", upage);
+               // printf("🚨 find_page_entry failed for stack page at %p\n", upage);
                 exit(-1);
             }
         } 
         else {
             //? DEBUG
-            print_page_table(&thread_current()->page_table);
-            printf("🚨 범위 이상함\n");
+            // print_page_table(&thread_current()->page_table);
+            // printf("🚨 범위 이상함\n");
             exit(-1);
         }
     }
@@ -229,14 +229,14 @@ page_fault (struct intr_frame *f)
     // read-only인데 write
     if (!p->writable && write) {
          //? DEBUG
-         printf("🚨 write to read-only page at %p\n", upage);
+         // printf("🚨 write to read-only page at %p\n", upage);
         exit(-1);
     }
 
     // 실제 페이지 로딩
     if (!load_page(p)) {
          //? DEBUG
-         printf("🚨 load_page failed for page at %p\n", upage);
+         // printf("🚨 load_page failed for page at %p\n", upage);
         exit(-1);
     }
 }
