@@ -161,10 +161,10 @@ the quarter.
 
 +----------------------------+---------------------------------+
 
-| Jeonghoon Park             |  
+| Jeonghoon Park             |  50%, Implemented frame, page table, mmap
 
 +----------------------------+---------------------------------+
 
-| Deokhyeon Kim              |  
+| Deokhyeon Kim              |  50%, Implemented eviction, swap, munmap
 
 +----------------------------+---------------------------------+
