@@ -97,6 +97,7 @@ syscall_handler (struct intr_frame *f UNUSED)
   // 여기서 f->eaxsms System Call 리턴 값을 저장하는 레지스터
   if (!is_valid_user_ptr(f->esp)) exit(-1);  // 유저 포인터 이상하면 바로 종료
   
+  thread_current()->user_esp = f->esp;
   int syscall_num = get_user((uint8_t *) f->esp);
   
   // 각각 의 syscall에 맞는 인자들을 검사
@@ -249,12 +250,12 @@ syscall_handler (struct intr_frame *f UNUSED)
     }
 
     //! MUNMAP
-    // case SYS_MUNMAP: {
-    //     if (!is_user_vaddr(f->esp + 4)) exit(-1);
-    //     mapid_t idx = *(mapid_t *)(f->esp + 4);
-    //     syscall_munmap(idx);
-    //     break;
-    // }
+    case SYS_MUNMAP: {
+        if (!is_user_vaddr(f->esp + 4)) exit(-1);
+        mapid_t idx = *(mapid_t *)(f->esp + 4);
+        syscall_munmap(idx);
+        break;
+    }
 
     default:
       // 이상한 syscall 번호가 들어오면 종료
@@ -547,4 +548,52 @@ mapid_t syscall_mmap(int fd, void *addr, void *esp) {
     }
 
     return mf->idx;
+}
+
+void syscall_munmap(mapid_t target_idx) {
+    struct thread *t = thread_current();
+    struct list_elem *e;
+    struct mmap_file *mf = NULL;
+
+    // mmap_list에서 해당 idx를 가진 mmap_file 찾기
+    for (e = list_begin(&t->mmap_list); e != list_end(&t->mmap_list); e = list_next(e)) {
+        struct mmap_file *cur = list_entry(e, struct mmap_file, elem);
+        if (cur->idx == target_idx) {
+            mf = cur;
+            break;
+        }
+    }
+
+    if (mf == NULL) return;
+
+    void *addr = mf->addr;
+    size_t left = mf->length;
+
+    // 매핑된 주소 범위 순회하면서
+    while (left > 0) {
+        struct page *p = find_page_entry(&t->page_table, addr);
+
+        if (p && p->is_loaded) {
+            // dirty면 파일에 저장
+            if (pagedir_is_dirty(t->pagedir, p->vaddr) && p->file && p->read_bytes > 0) {
+                file_write_at(p->file, p->vaddr, p->read_bytes, p->offset);
+            }
+
+            pagedir_clear_page(t->pagedir, p->vaddr);  // 유저 페이지 제거
+            void *kpage = pagedir_get_page(t->pagedir, p->vaddr);
+            if (kpage != NULL) frame_free(kpage);
+        }
+
+        // SPT에서 entry 제거
+        if (p) {
+            hash_delete(&t->page_table, &p->elem);
+        }
+
+        addr += PGSIZE;
+        left = (left > PGSIZE) ? left - PGSIZE : 0;
+    }
+
+    file_close(mf->file);
+    list_remove(&mf->elem);
+    free(mf);
 }

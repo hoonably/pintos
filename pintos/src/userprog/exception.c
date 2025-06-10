@@ -188,7 +188,7 @@ page_fault (struct intr_frame *f)
     //! Stack Grow
     if (p == NULL) {
         // fault_addr 범위가 Growable Stack 영역인가?
-        void *esp = f->esp;
+        void *esp = user ? f->esp : thread_current()->user_esp;
         if ((uint8_t *)fault_addr >= (uint8_t *)esp - 32 &&
             (uint8_t *)fault_addr >= (uint8_t *)PHYS_BASE - STACK_MAX_SIZE) {
 

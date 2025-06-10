@@ -182,6 +182,14 @@ process_exit (void)
     sema_up(&cur->s_wait);  // 부모가 wait() 중이면 깨워줌
   }
 
+  //! mmap 파일 닫기 전에 해제!!!!
+  struct list_elem *e, *next;
+  for (e = list_begin(&cur->mmap_list); e != list_end(&cur->mmap_list); e = next) {
+    next = list_next(e);
+    struct mmap_file *mf = list_entry(e, struct mmap_file, elem);
+    syscall_munmap(mf->idx);
+  }
+
   // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - 현재 실행중인 파일에 다시 쓰기가 가능하도록 바꿔줌
   if(cur->cur_file) {
     file_allow_write(cur->cur_file);

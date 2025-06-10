@@ -121,6 +121,7 @@ struct thread
    struct hash page_table;  // 보조 페이지 테이블 (SPT)
    struct list mmap_list;  // mmap_file 저장하는 리스트
    mapid_t mmap_idx;
+   void *user_esp;
 
    // ifdef 때문에 자꾸 VSCode에서 오류떠서 위로 올림
     uint32_t *pagedir;                  /* Page directory. */
