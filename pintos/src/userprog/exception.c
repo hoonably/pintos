@@ -169,17 +169,19 @@ page_fault (struct intr_frame *f)
      which fault_addr refers. */
 
   //? DEBUG
-//   printf ("✅ Page fault at %p: %s error %s page in %s context.\n",
-//           fault_addr,
-//           not_present ? "not present" : "rights violation",
-//           write ? "writing" : "reading",
-//           user ? "user" : "kernel");
+  printf ("✅ Page fault at %p: %s error %s page in %s context.\n",
+          fault_addr,
+          not_present ? "not present" : "rights violation",
+          write ? "writing" : "reading",
+          user ? "user" : "kernel");
 //   kill (f);
 
     void *upage = pg_round_down(fault_addr);
 
     // 유저 영역 접근 아닌 경우 무조건 종료
     if (!is_user_vaddr(upage)) {
+      //? DEBUG
+      printf("🚨 not user vaadr %p\n", upage);
         exit(-1);
     }
 
@@ -188,32 +190,53 @@ page_fault (struct intr_frame *f)
     //! Stack Grow
     if (p == NULL) {
         // fault_addr 범위가 Growable Stack 영역인가?
+        // TODO: 여기서 exit안해야하는 것도 exit(-1) 해버리는 상황 해결해야함. 논리상 맞는거같은데... 뭔가 위에서 문제인가
+
+        //? 현재 상태 : 갑자기 쭉 늘어나다가 0x24로 넘어가서 범위 컷으로 exit(-1)됨 오버플로우?
+         // ✅ Page fault at 0x81c4000: not present error writing page in user context.
+         // ✅ Page fault at 0x24: not present error writing page in kernel context.
+         // 🚨 범위 이상함
+
+        // make check 너무 오래걸리니까 따로 체크하는 법
+        // make
+        // pintos -v -k -T 300 --bochs  --filesys-size=2 -p tests/vm/page-linear -a page-linear --swap-size=4 -- -q  -f run page-linear < /dev/null 
+
         void *esp = user ? f->esp : thread_current()->user_esp;
         if ((uint8_t *)fault_addr >= (uint8_t *)esp - 32 &&
-            (uint8_t *)fault_addr >= (uint8_t *)PHYS_BASE - STACK_MAX_SIZE) {
+            (uint8_t *)fault_addr >= (uint8_t *)PHYS_BASE - (uint8_t *)STACK_MAX_SIZE) {  
 
             // 새로 stack 페이지 할당
             if (!allocate_page(PAGE_STACK, upage, true)) {
+                  //? DEBUG
+                  printf("🚨 allocate_page failed for stack page at %p\n", upage);
                 exit(-1);
             }
 
             p = find_page_entry(&thread_current()->page_table, upage);
             if (p == NULL) {
+               //? DEBUG
+               printf("🚨 find_page_entry failed for stack page at %p\n", upage);
                 exit(-1);
             }
         } 
         else {
+            //? DEBUG
+            printf("🚨 범위 이상함\n");
             exit(-1);
         }
     }
 
     // read-only인데 write
     if (!p->writable && write) {
+         //? DEBUG
+         printf("🚨 write to read-only page at %p\n", upage);
         exit(-1);
     }
 
     // 실제 페이지 로딩
     if (!load_page(p)) {
+         //? DEBUG
+         printf("🚨 load_page failed for page at %p\n", upage);
         exit(-1);
     }
 }
