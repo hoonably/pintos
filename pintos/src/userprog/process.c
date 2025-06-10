@@ -170,58 +170,110 @@ process_wait (tid_t child_tid UNUSED)
   return status;
 }
 
+static void
+page_destroy_func (struct hash_elem *e, void *aux UNUSED) {
+  struct page *p = hash_entry (e, struct page, elem);
+  free (p);
+}
+
 /* Free the current process's resources. */
 void
 process_exit (void)
 {
   struct thread *cur = thread_current ();
-  uint32_t *pd;
+  uint32_t *pd = cur->pagedir;
 
-  // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - 자식 프로세스 종료를 기다리는 부모를 깨움
-  if (cur->parent != NULL) {
-    sema_up(&cur->s_wait);  // 부모가 wait() 중이면 깨워줌
-  }
-
-  //! mmap 파일 닫기 전에 해제!!!!
-  struct list_elem *e, *next;
-  for (e = list_begin(&cur->mmap_list); e != list_end(&cur->mmap_list); e = next) {
-    next = list_next(e);
-    struct mmap_file *mf = list_entry(e, struct mmap_file, elem);
-    syscall_munmap(mf->idx);
-  }
-
-  // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - 현재 실행중인 파일에 다시 쓰기가 가능하도록 바꿔줌
-  if(cur->cur_file) {
-    file_allow_write(cur->cur_file);
-    file_close(cur->cur_file);
-    cur->cur_file = NULL;
-  }
-
-  /* Destroy the current process's page directory and switch back
-     to the kernel-only page directory. */
-  pd = cur->pagedir;
-  if (pd != NULL) 
+  // 1. Memory-mapped 파일 영역 프레임 해제
+  while (!list_empty (&cur->mmap_list))
     {
-      /* Correct ordering here is crucial.  We must set
-         cur->pagedir to NULL before switching page directories,
-         so that a timer interrupt can't switch back to the
-         process page directory.  We must activate the base page
-         directory before destroying the process's page
-         directory, or our active page directory will be one
-         that's been freed (and cleared). */
+      struct mmap_file *mf =
+        list_entry (list_pop_front (&cur->mmap_list), struct mmap_file, elem);
+      void *start = mf->addr;
+      void *end   = (uint8_t*)mf->addr + mf->length;
+
+      struct hash_iterator it;
+      hash_first (&it, &cur->page_table);
+      while (hash_next (&it))
+        {
+          struct page *p = hash_entry (hash_cur (&it), struct page, elem);
+          if (p->type == PAGE_MMAP
+              && p->vaddr >= start
+              && p->vaddr < end)
+            {
+              if (p->is_loaded)
+                {
+                  void *kpage = pagedir_get_page (pd, p->vaddr);
+                  if (kpage != NULL)
+                    {
+                      if (pagedir_is_dirty (pd, p->vaddr))
+                        file_write_at (mf->file,
+                                       kpage,
+                                       p->read_bytes,
+                                       p->offset);
+                      frame_free (kpage);
+                      pagedir_clear_page (pd, p->vaddr);
+                    }
+                }
+            }
+        }
+
+      file_close (mf->file);
+      free (mf);
+    }
+
+  // 2. 나머지 페이지(코드, 스택, 스왑) 프레임 해제
+  if (pd != NULL)
+    {
+      struct hash_iterator it;
+      hash_first (&it, &cur->page_table);
+      while (hash_next (&it))
+        {
+          struct page *p = hash_entry (hash_cur (&it), struct page, elem);
+          if (p->is_loaded)
+            {
+              void *kpage = pagedir_get_page (pd, p->vaddr);
+              if (kpage != NULL)
+                {
+                  frame_free (kpage);
+                  pagedir_clear_page (pd, p->vaddr);
+                }
+            }
+        }
+    }
+
+  // 3. 보조 페이지 테이블 엔트리 해제
+  hash_destroy (&cur->page_table, page_destroy_func);
+
+  // 4. 열린 파일 디스크립터 닫기
+  int fd;
+  for (fd = 2; fd < FD_MAX; fd++)
+    {
+      if (cur->fd_table[fd] != NULL)
+        {
+          file_close (cur->fd_table[fd]);
+          cur->fd_table[fd] = NULL;
+        }
+    }
+
+  // 5. 실행 중이던 ELF 파일 닫기
+  if (cur->cur_file)
+    {
+      file_allow_write (cur->cur_file);
+      file_close (cur->cur_file);
+      cur->cur_file = NULL;
+    }
+
+  // 6. 부모가 wait 중이면 깨우기
+  if (cur->parent != NULL)
+    sema_up (&cur->s_wait);
+
+  // 7. 페이지 디렉터리 파괴 및 커널‐only 디렉터리로 전환
+  if (pd != NULL)
+    {
       cur->pagedir = NULL;
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
-  
-  // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - fd_table에 있는 파일들 모두 닫아줌
-  int i;
-  for (i = 2; i < FD_MAX; i++) {
-    if (cur->fd_table[i]) {
-      file_close(cur->fd_table[i]);
-      cur->fd_table[i] = NULL;
-    }
-  }
 }
 
 /* Sets up the CPU for running user code in the current

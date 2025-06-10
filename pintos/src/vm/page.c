@@ -155,8 +155,6 @@ bool load_page(struct page *vme) {
     return true;
 }
 
-
-
 void print_page_table(struct hash *page_table) {
     struct hash_iterator i;
     hash_first(&i, page_table);

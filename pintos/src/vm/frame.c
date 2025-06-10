@@ -8,10 +8,10 @@
 static struct list frame_list;
 static struct lock frame_lock;
 
-//! 스왑·클록 교체 알고리즘
 static void *frame_evict_and_reuse() {
     struct list_elem *e;
-    for (;;) {
+    lock_acquire(&frame_lock);
+    while(1) {
         for (e = list_begin(&frame_list);
              e != list_end(&frame_list);
              e = list_next(e)) {
@@ -32,6 +32,7 @@ static void *frame_evict_and_reuse() {
                 void *k = victim->kpage;
                 list_remove(&victim->elem);
                 free(victim);
+                lock_release(&frame_lock);
                 return k;
             }
             pagedir_set_accessed(
@@ -54,19 +55,19 @@ void frame_table_init(void) {
 // PAL_ZERO: 페이지를 0으로 초기화해서 할당
 // PAL_ASSERT: 할당 실패 시 kernel panic
 void *frame_alloc(enum palloc_flags flags, void *upage) {
-    lock_acquire(&frame_lock);
-
     // 물리 페이지 하나 확보
     void *kpage = palloc_get_page(flags);
     if (kpage == NULL) {
-        lock_release(&frame_lock);
-        //! frame이 부족할 경우 eviction 정책 적용
-        kpage = frame_evict_and_reuse();  // 안쓰는 변수라 그냥 뺌
-        if (!kpage)
-            return NULL;
-        lock_acquire(&frame_lock);
+        kpage = palloc_get_page(0);
+        if (kpage == NULL) {
+            //! frame이 부족할 경우 eviction 정책 적용
+            kpage = frame_evict_and_reuse();  // 안쓰는 변수라 그냥 뺌
+            if (!kpage)
+                return NULL;
+        }
     }
 
+    lock_acquire(&frame_lock);
     // frame 메타데이터 동적 생성
     struct frame *f = malloc(sizeof(struct frame));
     if (f == NULL) {
@@ -97,9 +98,9 @@ void frame_free(void *kpage) {
              e = list_next(e)) {
         struct frame *f = list_entry(e, struct frame, elem);
         if (f->kpage == kpage) {
-            /* ① 보조 페이지 테이블에서 대응 vme 찾기 */
+            //! 보조 페이지 테이블에서 대응 vme 찾기
             struct page *vme = find_page_entry(&f->thread->page_table, f->upage);
-            /* ② 스왑 슬롯에 올라가 있으면 해제 */
+            //! swap slot에 올라가 있으면 해제
             if (vme != NULL && vme->type == PAGE_SWAP && vme->swap_slot >= 0)
                 swap_free((size_t)vme->swap_slot);
 

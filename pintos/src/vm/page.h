@@ -47,7 +47,7 @@ struct mmap_file {
     mapid_t idx;
     struct file *file;  // 매핑된 파일
     void *addr;  // 시작 가상 주소
-    size_t length;  //* 전체 바이트 수
+    size_t length;  // 전체 바이트 수
     struct list_elem elem;
 };
 
