@@ -62,5 +62,7 @@ bool load_page(struct page *vme);
 struct page *find_page_entry(struct hash *page_table, void *vaddr);
 bool insert_page_entry(struct hash *page_table, struct page *vme);
 
+void print_page_table(struct hash *page_table);
+
 
 #endif

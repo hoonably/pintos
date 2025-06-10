@@ -107,6 +107,11 @@ bool allocate_page(enum page_type type, void *vaddr, bool writable) {
 bool load_page(struct page *vme) {
     ASSERT(vme != NULL);
 
+    //? DEBUG
+    printf("🔍 vaddr=%p type=%d file=%p read_bytes=%u zero_bytes=%u\n",
+       vme->vaddr, vme->type, vme->file, vme->read_bytes, vme->zero_bytes);
+
+
     // 이미 로딩되어 있다면 성공 처리
     if (vme->is_loaded)
         return true;
@@ -147,4 +152,16 @@ bool load_page(struct page *vme) {
 
     vme->is_loaded = true;
     return true;
+}
+
+
+
+void print_page_table(struct hash *page_table) {
+    struct hash_iterator i;
+    hash_first(&i, page_table);
+    while (hash_next(&i)) {
+        struct page *p = hash_entry(hash_cur(&i), struct page, elem);
+        printf("🧾 Page: vaddr=%p, type=%d, offset=%d, read_bytes=%d, zero_bytes=%d, file=%p, is_loaded=%d\n",
+               p->vaddr, p->type, p->offset, p->read_bytes, p->zero_bytes, p->file, p->is_loaded);
+    }
 }
