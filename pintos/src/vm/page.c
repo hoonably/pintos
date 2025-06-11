@@ -1,5 +1,6 @@
 #include "vm/page.h"
 #include <string.h>
+#include <stdio.h>
 #include "filesys/file.h"
 #include "userprog/pagedir.h"
 #include "threads/malloc.h"

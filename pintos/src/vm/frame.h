@@ -23,6 +23,7 @@ struct frame {
     struct list_elem elem;
 };
 
+void *frame_evict_and_reuse(void);
 void *frame_alloc(enum palloc_flags flags, void *upage);
 void frame_free(void *kpage);
 void frame_table_init(void);

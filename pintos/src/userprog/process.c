@@ -17,6 +17,7 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "threads/malloc.h"
 #include "devices/timer.h"
 #include "userprog/syscall.h"
 #include "vm/frame.h"
@@ -197,8 +198,7 @@ process_exit (void)
         {
           struct page *p = hash_entry (hash_cur (&it), struct page, elem);
           if (p->type == PAGE_MMAP
-              && p->vaddr >= start
-              && p->vaddr < end)
+              && (uintptr_t)p->vaddr >= (uintptr_t)start && (uintptr_t)p->vaddr < (uintptr_t)end)
             {
               if (p->is_loaded)
                 {

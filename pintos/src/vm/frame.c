@@ -8,7 +8,7 @@
 static struct list frame_list;
 static struct lock frame_lock;
 
-static void *frame_evict_and_reuse() {
+void *frame_evict_and_reuse(void) {
     struct list_elem *e;
     lock_acquire(&frame_lock);
     while(1) {

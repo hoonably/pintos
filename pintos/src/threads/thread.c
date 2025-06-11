@@ -256,7 +256,7 @@ struct thread *get_child(tid_t tid) {
 
 // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - priority 기준으로 비교
 bool
-priority_comp (const struct list_elem *a, const struct list_elem *b, void *aux)
+priority_comp (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
 {
   struct thread *t1 = list_entry(a, struct thread, elem);
   struct thread *t2 = list_entry(b, struct thread, elem);
