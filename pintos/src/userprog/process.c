@@ -33,7 +33,7 @@ process_execute (const char *file_name)
   tid_t tid;
 
   fn_copy = palloc_get_page(0);
-  fn_parse = palloc_get_page(0);  // ✅✅✅✅✅ - 파싱용으로도 따로 만들어줘야함
+  fn_parse = palloc_get_page(0);  // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - 파싱용으로도 따로 만들어줘야함
   if (fn_copy == NULL || fn_parse == NULL)
     return TID_ERROR;
 
@@ -75,10 +75,10 @@ start_process (void *file_name_)
   success = load (program, &if_.eip, &if_.esp);
 
 
-  // ✅✅✅✅✅ - 자식 프로세스의 load 성공 여부 저장
+  // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - 자식 프로세스의 load 성공 여부 저장
   thread_current()->is_load = success;
 
-  // ✅✅✅✅✅ - 부모 프로세스의 exec() 대기 해제 (load 완료 알림)
+  // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - 부모 프로세스의 exec() 대기 해제 (load 완료 알림)
   sema_up(&thread_current()->s_load);
 
   if(success) {
@@ -174,12 +174,12 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
-  // ✅✅✅✅✅ - 자식 프로세스 종료를 기다리는 부모를 깨움
+  // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - 자식 프로세스 종료를 기다리는 부모를 깨움
   if (cur->parent != NULL) {
     sema_up(&cur->s_wait);  // 부모가 wait() 중이면 깨워줌
   }
 
-  // ✅✅✅✅✅ - 현재 실행중인 파일에 다시 쓰기가 가능하도록 바꿔줌
+  // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - 현재 실행중인 파일에 다시 쓰기가 가능하도록 바꿔줌
   if(cur->cur_file) {
     file_allow_write(cur->cur_file);
     file_close(cur->cur_file);
@@ -203,7 +203,7 @@ process_exit (void)
       pagedir_destroy (pd);
     }
   
-  // ✅✅✅✅✅ - fd_table에 있는 파일들 모두 닫아줌
+  // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - fd_table에 있는 파일들 모두 닫아줌
   int i;
   for (i = 2; i < FD_MAX; i++) {
     if (cur->fd_table[i]) {
@@ -326,7 +326,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
       goto done; 
     }
 
-  // ✅✅✅✅✅ - 현재 실행중인 파일에 쓰기 금지
+  // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - 현재 실행중인 파일에 쓰기 금지
   t->cur_file = file;
   file_deny_write(t->cur_file);
 
