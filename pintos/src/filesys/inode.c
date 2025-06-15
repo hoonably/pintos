@@ -10,14 +10,22 @@
 /* Identifies an inode. */
 #define INODE_MAGIC 0x494e4f44
 
+#define INODE_DIRECT_BLOCKS 124  //! 총 512 bytes의 블록인데, 남는 496 bytes를 direct_block에 할당 (4 bytes * 124 = 496 bytes)
+#define INDIRECT_BLOCK 128  //! BLOCK_SECTOR_SIZE = 512 bytes, block_sector_t = 4 bytes -> 한 블록에 sector 번호 128개 저장 가능
+
 /* On-disk inode.
    Must be exactly BLOCK_SECTOR_SIZE bytes long. */
 struct inode_disk
   {
-    block_sector_t start;               /* First data sector. */
-    off_t length;                       /* File size in bytes. */
-    unsigned magic;                     /* Magic number. */
-    uint32_t unused[125];               /* Not used. */
+    // block_sector_t start;               /* First data sector. */
+    off_t length;                       /* File size in bytes. */  //? 4 bytes
+    unsigned magic;                     /* Magic number. */  //? 4 bytes
+    // uint32_t unused[125];               /* Not used. */
+    //! 직접 파일 데이터 블록 포인터
+    block_sector_t direct_block[INODE_DIRECT_BLOCKS];  //? 4 * 124 = 496 bytes
+    //! 1, 2 단계 indirect 참조 포인터
+    block_sector_t indirect_block_sector;  //? 4 bytes
+    block_sector_t double_indirect_block_sector;  //? 4 bytes
   };
 
 /* Returns the number of sectors to allocate for an inode SIZE
@@ -47,8 +55,13 @@ static block_sector_t
 byte_to_sector (const struct inode *inode, off_t pos) 
 {
   ASSERT (inode != NULL);
-  if (pos < inode->data.length)
-    return inode->data.start + pos / BLOCK_SECTOR_SIZE;
+  //! 기존 방식
+  // if (pos < inode->data.length)
+  //   return inode->data.start + pos / BLOCK_SECTOR_SIZE;
+  //! indexed 방식 (direct block만 처리)
+  size_t idx = pos / BLOCK_SECTOR_SIZE;
+  if (pos < inode->data.length && idx < INODE_DIRECT_BLOCKS)
+    return inode->data.direct_block[idx]; // direct block에서 바로 반환
   else
     return -1;
 }
@@ -87,22 +100,41 @@ inode_create (block_sector_t sector, off_t length)
       size_t sectors = bytes_to_sectors (length);
       disk_inode->length = length;
       disk_inode->magic = INODE_MAGIC;
-      if (free_map_allocate (sectors, &disk_inode->start)) 
-        {
-          block_write (fs_device, sector, disk_inode);
-          if (sectors > 0) 
-            {
-              static char zeros[BLOCK_SECTOR_SIZE];
-              size_t i;
-              
-              for (i = 0; i < sectors; i++) 
-                block_write (fs_device, disk_inode->start + i, zeros);
-            }
-          success = true; 
-        } 
-      free (disk_inode);
+      //! 기존 방식: start 섹터부터 연속적으로 할당하는 방식
+      // if (free_map_allocate (sectors, &disk_inode->start)) 
+        // {
+        //   block_write (fs_device, sector, disk_inode);
+        //   if (sectors > 0) 
+        //     {
+        //       static char zeros[BLOCK_SECTOR_SIZE];
+        //       size_t i;
+        //              
+        //       for (i = 0; i < sectors; i++) 
+        //         block_write (fs_device, disk_inode->start + i, zeros);
+        //     }
+        //   success = true; 
+        // } 
+
+      //! direct_block 배열에 하나씩 할당
+      static char zeros[BLOCK_SECTOR_SIZE];
+      size_t i;
+
+      // 섹터 하나씩 direct_block에 할당
+      for (i = 0; i < sectors; i++) {
+        if (!free_map_allocate(1, &disk_inode->direct_block[i])) {
+          //* 할당 실패 시 rollback
+          while (i--) {
+            free_map_release(disk_inode->direct_block[i], 1);
+          }
+          return false;
+        }
+        block_write(fs_device, disk_inode->direct_block[i], zeros);
+      }
+
+      // 전체 섹터 정상 할당된 경우
+      block_write(fs_device, sector, disk_inode);
     }
-  return success;
+  return true;
 }
 
 /* Reads an inode from SECTOR
@@ -177,8 +209,15 @@ inode_close (struct inode *inode)
       if (inode->removed) 
         {
           free_map_release (inode->sector, 1);
-          free_map_release (inode->data.start,
-                            bytes_to_sectors (inode->data.length)); 
+          //! 기존에는 start 섹터부터 연속된 블록들을 해제
+          // free_map_release (inode->data.start,
+          // bytes_to_sectors (inode->data.length)); 
+          //! indexed 구조에서는 direct_block 배열에 따라 개별 해제
+          size_t sectors = bytes_to_sectors(inode->data.length);
+          size_t i;
+          for (i = 0; i < sectors; i++) {
+            free_map_release(inode->data.direct_block[i], 1);
+          }
         }
 
       free (inode); 
