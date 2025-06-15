@@ -3,8 +3,7 @@
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
-
-// Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ 
+#include "threads/malloc.h"
 #include "threads/vaddr.h"
 #include "userprog/pagedir.h"
 #include "threads/thread.h"
@@ -12,15 +11,13 @@
 #include "userprog/process.h"
 #include "filesys/filesys.h"
 #include "threads/synch.h"
-
-// Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ 입출력 관련 헤더
 #include "devices/input.h"
 #include "filesys/file.h"
 
 // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - file 여러개 접근 방지 lock
 struct lock file_lock;
 
-static void syscall_handler (struct intr_frame *);
+bool is_valid_buffer(const void* buffer, unsigned size); // 유효한 버퍼인지 검사
 
 // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️
 // 미리 포인터를 검사하고 쓰기
@@ -262,7 +259,6 @@ void exit(int status) {
   thread_exit();
 }
 
-// Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️
 // 새로운 사용자 프로세스를 실행하고 pid 반환
 // 자식 프로세스가 load에 성공할 때까지 부모는 대기
 // 실패 시 -1 반환
@@ -279,7 +275,6 @@ pid_t exec(const char *cmd_line) {
   return tid;
 }
 
-// Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️
 // 자식 프로세스 pid의 종료를 기다리고 종료 코드를 반환
 // pid가 자식이 아니거나 이미 기다린 경우 -1 반환
 // 자식이 exit()을 호출하면 그 값을 반환
@@ -334,7 +329,6 @@ int open(const char *file) {
   return fd;
 }
 
-// Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️
 // 열려 있는 파일 디스크립터 fd의 총 바이트 크기를 반환
 // 잘못된 fd이거나 닫힌 파일이면 -1 반환
 // 내부적으로 file_length() 사용
@@ -347,7 +341,6 @@ int filesize(int fd) {
   return file_length(f);
 }
 
-// Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - buffer가 valid한지 확인
 bool is_valid_buffer(const void* buffer, unsigned size) {
   if(!buffer) return 0;
 
@@ -360,7 +353,7 @@ bool is_valid_buffer(const void* buffer, unsigned size) {
   return 1;
 }
 
-// Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️
+
 // fd로부터 size만큼 데이터를 읽어 buffer에 저장
 // fd == 0이면 키보드에서 입력, 그 외는 파일에서 읽음
 // 읽은 바이트 수 반환, 실패 시 -1
@@ -380,6 +373,9 @@ int read(int fd, void *buffer, unsigned size) {
 
   // file descriptor check & file check
   if (fd < 2 || fd >= FD_MAX) return -1;
+  //? DEBUG
+  // printf("🚨 READ fd=%d, buffer=%p, size=%u\n", fd, buffer, size);
+
   struct file *f = thread_current()->fd_table[fd];
   if (f == NULL) return -1;
 
@@ -392,7 +388,7 @@ int read(int fd, void *buffer, unsigned size) {
 }
 
 
-// Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - fd에 size만큼 buffer 내용을 씀
+// fd에 size만큼 buffer 내용을 씀
 // fd == 1이면 콘솔, 그 외에는 열린 파일에 기록
 // 실제로 쓴 바이트 수를 반환
 int write(int fd, const void *buffer, unsigned size) {
@@ -407,18 +403,23 @@ int write(int fd, const void *buffer, unsigned size) {
 
   // file descriptor check & file check
   if (fd < 2 || fd >= FD_MAX) return -1;
+
+  //? DEBUG
+  // printf("🚨 WRITE fd=%d, buffer=%p, size=%u\n", fd, buffer, size);
+  // hex_dump((uintptr_t)buffer, buffer, 32, true);  // 앞부분만
+
   struct file *f = thread_current()->fd_table[fd];
   if (f == NULL) return -1;
 
   // 파일에 출력
-  struct file *cur_file = thread_current()->cur_file;
+  // struct file *cur_file = thread_current()->cur_file;
   lock_acquire(&file_lock);
   int bytes_write = file_write(f, buffer, size);
   lock_release(&file_lock);
   return bytes_write;
 }
 
-// Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - fd 파일에서 현재 보고있는 위치를 position으로 변경
+// fd 파일에서 현재 보고있는 위치를 position으로 변경
 void seek(int fd, unsigned position) {
   if(fd < 2 || fd >= FD_MAX) return;
   struct file *f = thread_current()->fd_table[fd];
@@ -426,7 +427,7 @@ void seek(int fd, unsigned position) {
   file_seek(f, position);
 }
 
-// Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️ - fd 파일에서 현재 보고있는 위치를 반환
+// fd 파일에서 현재 보고있는 위치를 반환
 unsigned tell(int fd) {
   if(fd < 2 || fd >= FD_MAX) return -1;
   struct file *f = thread_current()->fd_table[fd];

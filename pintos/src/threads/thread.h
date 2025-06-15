@@ -121,9 +121,9 @@ struct thread
    struct file *cur_file;  // 실행 중인 파일에 대한 포인터, 쓰기 방지
    // Ⓜ️Ⓜ️Ⓜ️Ⓜ️Ⓜ️
 
+   uint32_t *pagedir;                  /* Page directory. */
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
-    uint32_t *pagedir;                  /* Page directory. */
     #endif
 
     /* Owned by thread.c. */
