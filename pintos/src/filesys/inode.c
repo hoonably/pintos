@@ -10,8 +10,10 @@
 /* Identifies an inode. */
 #define INODE_MAGIC 0x494e4f44
 
-#define INODE_DIRECT_BLOCKS 124  //! 총 512 bytes의 블록인데, 남는 496 bytes를 direct_block에 할당 (4 bytes * 124 = 496 bytes)
-#define INDIRECT_BLOCK 128  //! BLOCK_SECTOR_SIZE = 512 bytes, block_sector_t = 4 bytes -> 한 블록에 sector 번호 128개 저장 가능
+//! BLOCK_SECTOR_SIZE = 512 bytes에서 4 byte짜리 3개 빼고 남는 500 bytes를 direct_block에 할당 (4 bytes * 125 = 500 bytes)
+#define INODE_DIRECT_CNT 125
+//! BLOCK_SECTOR_SIZE = 512 bytes, block_sector_t = 4 bytes -> 한 블록에 sector 번호 128개 저장 가능
+#define INDIRECT_BLOCK_CNT 128
 
 /* On-disk inode.
    Must be exactly BLOCK_SECTOR_SIZE bytes long. */
@@ -21,11 +23,10 @@ struct inode_disk
     off_t length;                       /* File size in bytes. */  //? 4 bytes
     unsigned magic;                     /* Magic number. */  //? 4 bytes
     // uint32_t unused[125];               /* Not used. */
-    //! 직접 파일 데이터 블록 포인터
-    block_sector_t direct_block[INODE_DIRECT_BLOCKS];  //? 4 * 124 = 496 bytes
-    //! 1, 2 단계 indirect 참조 포인터
+    //! direct 파일 데이터 블록 포인터
+    block_sector_t direct_block[INODE_DIRECT_CNT];  //? 4 * 125 = 500 bytes
+    //! indirect 참조 포인터 (간접 테이블로 블록들 연결)
     block_sector_t indirect_block_sector;  //? 4 bytes
-    block_sector_t double_indirect_block_sector;  //? 4 bytes
   };
 
 /* Returns the number of sectors to allocate for an inode SIZE
@@ -58,10 +59,16 @@ byte_to_sector (const struct inode *inode, off_t pos)
   //! 기존 방식
   // if (pos < inode->data.length)
   //   return inode->data.start + pos / BLOCK_SECTOR_SIZE;
-  //! indexed 방식 (direct block만 처리)
+
   size_t idx = pos / BLOCK_SECTOR_SIZE;
-  if (pos < inode->data.length && idx < INODE_DIRECT_BLOCKS)
+  //! direct block
+  if (idx < INODE_DIRECT_CNT)
     return inode->data.direct_block[idx]; // direct block에서 바로 반환
+
+  // TODO: indirect block
+  if (idx < INODE_DIRECT_CNT + INDIRECT_BLOCK_CNT) {
+    return -1;  // 아직 미구현
+  }
   else
     return -1;
 }
@@ -118,18 +125,20 @@ inode_create (block_sector_t sector, off_t length)
       //! direct_block 배열에 하나씩 할당
       static char zeros[BLOCK_SECTOR_SIZE];
       size_t i;
-
-      // 섹터 하나씩 direct_block에 할당
       for (i = 0; i < sectors; i++) {
+        if (i >= INODE_DIRECT_CNT) {
+          break;  // direct block 개수 초과 -> indirect block로
+        }
         if (!free_map_allocate(1, &disk_inode->direct_block[i])) {
-          //* 할당 실패 시 rollback
-          while (i--) {
-            free_map_release(disk_inode->direct_block[i], 1);
-          }
           return false;
         }
         block_write(fs_device, disk_inode->direct_block[i], zeros);
       }
+
+      // TODO: indirect_block
+      // if (sectors > INODE_DIRECT_CNT) {
+        
+      // }
 
       // 전체 섹터 정상 할당된 경우
       block_write(fs_device, sector, disk_inode);
@@ -288,6 +297,39 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
   return bytes_read;
 }
 
+bool inode_grow(struct inode *inode, off_t new_length) {
+  // 기존파일과 신규 파일의 크기를 섹터 단위로 계산
+  size_t old_sectors = bytes_to_sectors(inode->data.length);
+  size_t new_sectors = bytes_to_sectors(new_length);
+
+  // 0으로 채워진 메모리 버퍼 하나 생성
+  static char zeros[BLOCK_SECTOR_SIZE];
+
+  //! direct block grow
+  size_t i;
+  for (i = old_sectors; i < new_sectors; i++) {
+    if (i >= INODE_DIRECT_CNT) {
+      break;  // direct block 개수 초과 -> indirect block로
+    }
+    // 새로운 블록 할당 실패 -> grow 실패
+    if (!free_map_allocate(1, &inode->data.direct_block[i])) {
+      return false;
+    }
+    // 새로 할당된 블록을 0으로 초기화
+    block_write(fs_device, inode->data.direct_block[i], zeros);
+  }
+
+  // TODO: indirect block grow
+  if (new_sectors > INODE_DIRECT_CNT) {
+    return false;  // 아직 미구현
+  }
+
+  inode->data.length = new_length;  // 길이 업데이트
+  
+  block_write(fs_device, inode->sector, &inode->data);  // 디스크에 inode 정보 업데이트
+  return true;
+}
+
 /* Writes SIZE bytes from BUFFER into INODE, starting at OFFSET.
    Returns the number of bytes actually written, which may be
    less than SIZE if end of file is reached or an error occurs.
@@ -303,6 +345,12 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 
   if (inode->deny_write_cnt)
     return 0;
+
+  //! grow 해야한다면
+  off_t end = offset + size;  // 쓰려는 마지막 바이트 위치
+  if (end > inode->data.length) {  //* 현재 파일 크기 (inode->data.length) 보다 더 뒤까지 쓰려고 하면
+    if (!inode_grow(inode, end)) return 0;  // grow 실패 -> 쓰기 실패
+  }
 
   while (size > 0) 
     {
