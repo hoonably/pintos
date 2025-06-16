@@ -65,9 +65,14 @@ byte_to_sector (const struct inode *inode, off_t pos)
   if (idx < INODE_DIRECT_CNT)
     return inode->data.direct_block[idx]; // direct block에서 바로 반환
 
-  // TODO: indirect block
+  //! indirect block
   if (idx < INODE_DIRECT_CNT + INDIRECT_BLOCK_CNT) {
-    return -1;  // 아직 미구현
+    // indirect 블록 안에 있는 포인터 배열 읽어서 블록 포인터 찾기
+    block_sector_t indirect_block[INDIRECT_BLOCK_CNT];
+    block_read(fs_device, inode->data.indirect_block_sector, indirect_block);
+
+    // indirect block 배열에서 해당 인덱스의 실제 data block 번호 return
+    return indirect_block[idx - INODE_DIRECT_CNT];  
   }
   else
     return -1;
