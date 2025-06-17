@@ -23,7 +23,7 @@ struct inode_disk
     off_t length;                       /* File size in bytes. */  //? 4 bytes
     unsigned magic;                     /* Magic number. */  //? 4 bytes
     // uint32_t unused[125];               /* Not used. */
-    //! direct 파일 데이터 블록 포인터
+    //! direct 파일 데이터 블록 포인터 (unused 쓸바에 direct_block 배열로 하면 더 효율적)
     block_sector_t direct_block[INODE_DIRECT_CNT];  //? 4 * 125 = 500 bytes
     //! indirect 참조 포인터 (간접 테이블로 블록들 연결)
     block_sector_t indirect_block_sector;  //? 4 bytes
@@ -142,7 +142,7 @@ inode_create (block_sector_t sector, off_t length)
 
       // TODO: indirect_block
       // if (sectors > INODE_DIRECT_CNT) {
-        
+
       // }
 
       // 전체 섹터 정상 할당된 경우
@@ -326,7 +326,26 @@ bool inode_grow(struct inode *inode, off_t new_length) {
 
   // TODO: indirect block grow
   if (new_sectors > INODE_DIRECT_CNT) {
-    return false;  // 아직 미구현
+    size_t indirect_needed = new_sectors - INODE_DIRECT_CNT;
+    block_sector_t indirect_block[INDIRECT_BLOCK_CNT];
+    memset(indirect_block, 0, sizeof(indirect_block));
+
+    // 기존 indirect block이 없다면 새로 할당
+    if (!free_map_allocate(1, &inode->data.indirect_block_sector))
+      return false;
+    else {
+      block_read(fs_device, inode->data.indirect_block_sector, indirect_block);
+    }
+    
+    int i = 0;
+    for (i = 0; i < indirect_needed; i++) {
+      if (!free_map_allocate(1, &indirect_block[i])){
+        return false;
+      }
+      block_write(fs_device, indirect_block[i], zeros);
+    }
+
+    block_write(fs_device, inode->data.indirect_block_sector, indirect_block);
   }
 
   inode->data.length = new_length;  // 길이 업데이트
