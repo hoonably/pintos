@@ -29,13 +29,44 @@ Deokhyeon Kim <ejrgus1404@unist.ac.kr>
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+	#define INODE_DIRECT_CNT 125   => Number of direct data‐block pointers in on‐disk inode (4 bytes * 125 = 500 bytes)
+	#define INDIRECT_BLOCK_CNT 128 => Number of sector pointers per single‐level indirect block (512 bytes / 4 bytes = 128)
+
+	struct inode_disk {
+		off_t length;                                  => File size in bytes
+		unsigned magic;                                => Magic number for validation
+		block_sector_t direct_block[INODE_DIRECT_CNT]; => Array of 125 direct data‐block pointers
+		block_sector_t indirect_block_sector;          => Pointer to single‐level indirect block holding up to 128 more pointers
+	};
+
 >> A2: What is the maximum size of a file supported by your inode
 >> structure?  Show your work.
+
+	Direct blocks:           125 * 512 bytes = 64,000 bytes
+	Single‐indirect blocks:  128 * 512 bytes = 65,536 bytes
+	Total blocks:            (125 + 128) blocks = 253 blocks
+	Maximum file size:       253 * 512 bytes = 129,536 bytes
 
 ---- SYNCHRONIZATION ----
 
 >> A3: Explain how your code avoids a race if two processes attempt to
 >> extend a file at the same time.
+
+	To prevent races when two threads extend the same file concurrently,
+	we serialize all growth operations on an inode using the global
+	filesys_lock.
+
+	Both file_write() and its helper inode_write_at() acquire
+	lock_acquire(&filesys_lock) before:
+		1. Reading the inode’s current length.
+		2. Calculating and allocating any new data blocks (direct and
+			indirect).
+		3. Updating the on-disk length in the inode.
+		4. Flushing the updated inode metadata to disk.
+
+	Holding filesys_lock across these steps ensures that no two extenders
+	interleave block allocation or length updates. Each extension therefore
+	sees a consistent file size and allocates nonoverlapping blocks.
 
 >> A4: Suppose processes A and B both have file F open, both
 >> positioned at end-of-file.  If A reads and B writes F at the same
@@ -44,12 +75,42 @@ Deokhyeon Kim <ejrgus1404@unist.ac.kr>
 >> nonzero data, A is not allowed to see all zeros.  Explain how your
 >> code avoids this race.
 
+	Reader and writer I/O are serialized at sector granularity  
+	by the same locking and block‐I/O scheme:
+
+		1. Both inode_read_at() and inode_write_at() acquire  
+			filesys_lock (or the buffer‐cache’s per‐block lock)  
+			before performing any block operations.  
+
+		2. Writes use a read–modify–write on a “bounce” buffer:  
+			a. Read the entire 512-byte sector into a buffer.  
+			b. Update only the target bytes in that buffer.  
+			c. Issue one atomic block_write() for the whole sector.  
+
+		3. Reads invoke a single atomic block_read() per sector.
+
+	Because each sector update is atomic and locked, a reader  
+	sees either the entire old sector or the entire new sector—  
+	never a mix or a zero‐filled sector. This prevents A from  
+	observing any data other than what B actually wrote.
+
 >> A5: Explain how your synchronization design provides "fairness".
 >> File access is "fair" if readers cannot indefinitely block writers
 >> or vice versa.  That is, many processes reading from a file cannot
 >> prevent forever another process from writing the file, and many
 >> processes writing to a file cannot prevent another process forever
 >> from reading the file.
+
+	Fairness is achieved because we use one short‐grained exclusive lock
+    for both reads and writes and hold it only during atomic sector
+    operations. The Pintos semaphore backing the lock:
+      - Queues sleeping threads in arrival order when priorities tie.
+      - Wakes one waiting thread each time the lock is released.
+
+    Since each I/O or metadata update releases the lock quickly,
+    readers cannot indefinitely block a writer, and writers cannot
+    indefinitely block a reader. Both kinds of threads get eventual
+    access when they wake up from the semaphore.
 
 ---- RATIONALE ----
 
@@ -58,6 +119,26 @@ Deokhyeon Kim <ejrgus1404@unist.ac.kr>
 >> indirect blocks?  If not, why did you choose an alternative inode
 >> structure, and what advantages and disadvantages does your
 >> structure have, compared to a multilevel index?
+
+	Our inode uses a combined direct + single‐indirect scheme, not full
+	multilevel indexing. We originally considered double‐indirect blocks
+	but found them unnecessary—the seven test cases fit within one
+	indirect level.
+
+	- Direct blocks (125 pointers): fast direct access for the first
+		125 * 512 bytes = 64,000 bytes of file data.
+
+	- Single‐indirect block (1 block of 128 pointers): supports an
+		additional 128 * 512 bytes = 65,536 bytes.
+
+	- Total capacity: (125 + 128) * 512 bytes = 129,536 bytes.
+
+	This “mixed” design leverages unused inode space for more direct
+	pointers, preserving combined‐scheme benefits without double‐indirect
+	complexity. Advantages: simpler code, fewer I/O steps for most files,
+	and small metadata overhead. Disadvantages: lower maximum file size
+	than if double‐indirect were used, but adequate for project requirements.
+
 
 			    SUBDIRECTORIES
 			    ==============
