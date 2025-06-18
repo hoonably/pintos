@@ -27,9 +27,9 @@ struct inode_disk
     off_t length;                       /* File size in bytes. */  //? 4 bytes
     unsigned magic;                     /* Magic number. */  //? 4 bytes
     // uint32_t unused[125];               /* Not used. */
-    //! direct 파일 데이터 블록 주소들 (unused 쓸바에 direct_block 배열로 하면 더 효율적)
+    //! direct 파일 데이터 블록 디스크 섹터 번호들 (unused 쓸바에 direct_block 배열로 하면 더 효율적)
     block_sector_t direct_block[INODE_DIRECT_CNT];  //? 4 * 125 = 500 bytes
-    //! indirect 참조 주소 (간접 테이블로 블록들 연결)
+    //! indirect 블록 테이블이 저장된 디스크 섹터 번호 (간접 테이블로 블록들 연결)
     block_sector_t indirect_block_sector;  //? 4 bytes
   };
 
@@ -236,6 +236,7 @@ inode_close (struct inode *inode)
           for (i = 0; i < sectors; i++) {
             free_map_release(inode->data.direct_block[i], 1);
           }
+          // TODO: indirect block 해제
         }
 
       free (inode); 
