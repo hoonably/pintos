@@ -10,9 +10,13 @@
 /* Identifies an inode. */
 #define INODE_MAGIC 0x494e4f44
 
-//! BLOCK_SECTOR_SIZE = 512 bytes에서 4 byte짜리 3개 빼고 남는 500 bytes를 direct_block에 할당 (4 bytes * 125 = 500 bytes)
+//! BLOCK_SECTOR_SIZE = 512 bytes
+//! struct inode_disk 안에서 length(4) + magic(4) + indirect_block_sector(4)를 제외한 나머지 500 bytes를 direct_block에 사용
+//! block_sector_t = 4 bytes이므로 125개 direct block 포인터 저장 가능
 #define INODE_DIRECT_CNT 125
-//! BLOCK_SECTOR_SIZE = 512 bytes, block_sector_t = 4 bytes -> 한 블록에 sector 번호 128개 저장 가능
+//! block_sector_t 하나는 4 bytes이고,
+//! 한 블록은 512 bytes이므로,
+//! 512 / 4 = 128개의 섹터 번호 저장 가능 -> INDIRECT_BLOCK_CNT = 128
 #define INDIRECT_BLOCK_CNT 128
 
 /* On-disk inode.
@@ -23,9 +27,9 @@ struct inode_disk
     off_t length;                       /* File size in bytes. */  //? 4 bytes
     unsigned magic;                     /* Magic number. */  //? 4 bytes
     // uint32_t unused[125];               /* Not used. */
-    //! direct 파일 데이터 블록 포인터 (unused 쓸바에 direct_block 배열로 하면 더 효율적)
+    //! direct 파일 데이터 블록 주소들 (unused 쓸바에 direct_block 배열로 하면 더 효율적)
     block_sector_t direct_block[INODE_DIRECT_CNT];  //? 4 * 125 = 500 bytes
-    //! indirect 참조 포인터 (간접 테이블로 블록들 연결)
+    //! indirect 참조 주소 (간접 테이블로 블록들 연결)
     block_sector_t indirect_block_sector;  //? 4 bytes
   };
 
@@ -331,14 +335,20 @@ bool inode_grow(struct inode *inode, off_t new_length) {
     memset(indirect_block, 0, sizeof(indirect_block));
 
     // 기존 indirect block이 없다면 새로 할당
-    if (!free_map_allocate(1, &inode->data.indirect_block_sector))
-      return false;
+    if (inode->data.indirect_block_sector == 0) {
+      if (!free_map_allocate(1, &inode->data.indirect_block_sector))
+        return false;
+    }
     else {
       block_read(fs_device, inode->data.indirect_block_sector, indirect_block);
     }
     
-    int i = 0;
-    for (i = 0; i < indirect_needed; i++) {
+    size_t i = 0;
+    // 기존에 indirect block까지 이미 일부 할당되어 있었으면 
+    if (old_sectors > INODE_DIRECT_CNT){
+      i = old_sectors - INODE_DIRECT_CNT;
+    }
+    for (; i < indirect_needed; i++) {
       if (!free_map_allocate(1, &indirect_block[i])){
         return false;
       }

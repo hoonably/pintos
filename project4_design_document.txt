@@ -35,8 +35,8 @@ Deokhyeon Kim <ejrgus1404@unist.ac.kr>
 	struct inode_disk {
 		off_t length;                                  => File size in bytes
 		unsigned magic;                                => Magic number for validation
-		block_sector_t direct_block[INODE_DIRECT_CNT]; => Array of 125 direct data‐block pointers
-		block_sector_t indirect_block_sector;          => Pointer to single‐level indirect block holding up to 128 more pointers
+		block_sector_t direct_block[INODE_DIRECT_CNT]; => Array of 125 direct data‐block sector numbers
+		block_sector_t indirect_block_sector;          => Sector number of a single-level indirect block that holds 128 sector entries
 	};
 
 >> A2: What is the maximum size of a file supported by your inode
@@ -125,16 +125,16 @@ Deokhyeon Kim <ejrgus1404@unist.ac.kr>
 	but found them unnecessary—the seven test cases fit within one
 	indirect level.
 
-	- Direct blocks (125 pointers): fast direct access for the first
+	- Direct blocks (125 sector numbers): fast direct access for the first
 		125 * 512 bytes = 64,000 bytes of file data.
 
-	- Single‐indirect block (1 block of 128 pointers): supports an
+	- Single‐indirect block (1 block of 128 sector entries): supports an
 		additional 128 * 512 bytes = 65,536 bytes.
 
 	- Total capacity: (125 + 128) * 512 bytes = 129,536 bytes.
 
 	This “mixed” design leverages unused inode space for more direct
-	pointers, preserving combined‐scheme benefits without double‐indirect
+	block references, preserving combined‐scheme benefits without double‐indirect
 	complexity. Advantages: simpler code, fewer I/O steps for most files,
 	and small metadata overhead. Disadvantages: lower maximum file size
 	than if double‐indirect were used, but adequate for project requirements.
@@ -235,10 +235,10 @@ the quarter.
 
 +----------------------------+---------------------------------+
 
-| Jeonghoon Park             |  %, 
+| Jeonghoon Park             |  50%, struct and overall inode layout design, direct block implementation
 
 +----------------------------+---------------------------------+
 
-| Deokhyeon Kim              |  %, 
+| Deokhyeon Kim              |  50%, indirect block implementation (byte_to_sector, grow)
 
 +----------------------------+---------------------------------+
