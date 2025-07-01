@@ -1,63 +1,37 @@
 
 # PintOS Project
 
+UNIST CSE 311 Operating System
+
 20201118 Jeonghoon Park  
 20201032 Deokhyeon Kim  
 
 <br>
 
-## Dockerfile
-
-```Dockerfile
-FROM ubuntu:12.04
-
-RUN sed -i -e 's/archive.ubuntu.com/old-releases.ubuntu.com/g' /etc/apt/sources.list
-RUN sed -i -e 's/security.ubuntu.com/old-releases.ubuntu.com/g' /etc/apt/sources.list
-
-RUN apt-get update && apt-get install -y \
-  bash \
-  vim \
-  build-essential \
-  gcc-4.4 \
-  gcc-multilib \
-  g++-4.4 \
-  perl \
-  wget \
-  patch \
-  libncurses5-dev \
-  libx11-dev libxrandr-dev xorg-dev \
-  make
-
-RUN mv /usr/bin/gcc-4.4 /usr/bin/gcc
-RUN mv /usr/bin/g++-4.4 /usr/bin/g++
-COPY ./bochs-2.2.6.tar.gz /root/
-RUN mkdir /root/pintos
-RUN echo 'export PATH="$PATH:/root/pintos/src/utils"' >> ~/.bashrc
-
-CMD ["/bin/bash"]
-```
-
----
-
-<br>
-
 ## Building the Docker Image
 
-### For amd64 (x86_64) – Windows
+📁 **Make sure you are inside the `setting/` directory before building the image:**
 
 ```bash
-sudo docker build -t pintos .
+cd setting
+```
+
+### For amd64 (x86\_64) – Windows
+
+```bash
+sudo docker build -t pintos-image .
 ```
 
 ### For ARM64 (Apple Silicon – macOS)
 
 ```bash
-docker build --platform=linux/amd64 -t pintos .
+docker build --platform=linux/amd64 -t pintos-image .
 ```
 
 <details><summary> ⚠️ Rosetta must be enabled for x86_64 emulation on Apple Silicon. </summary>
 
 ![Rosetta Setting](https://github.com/user-attachments/assets/b73e6e6e-b851-4611-82ce-3899333feb6e)
+
 </details>
 
 ---
@@ -66,20 +40,27 @@ docker build --platform=linux/amd64 -t pintos .
 
 ## Running the Container
 
-### On amd64 (x86_64) – Windows
+📁 **Before running the container, move to the project root directory**
+(so that the `pintos/` folder is mounted correctly):
+
+```bash
+cd ..
+```
+
+### On amd64 (x86\_64) – Windows
 
 ```bash
 sudo docker run -it -p 80:80 \
-  -v [your_pintos_root_dir]/pintos:/root/pintos \
-  --name [container_name] [image_name]
+  -v $(pwd)/pintos:/root/pintos \
+  --name pintos pintos-image
 ```
 
 ### On ARM64 (Apple Silicon – macOS)
 
 ```bash
 docker run --platform=linux/amd64 -it -p 80:80 \
-  -v [your_pintos_root_dir]/pintos:/root/pintos \
-  --name [container_name] [image_name]
+  -v $(pwd)/pintos:/root/pintos \
+  --name pintos pintos-image
 ```
 
 ---
@@ -91,10 +72,26 @@ docker run --platform=linux/amd64 -it -p 80:80 \
 To start the container again after the initial run:
 
 ```bash
-docker start -ai [container_name]
+docker start -ai pintos
 ```
 
-Once inside the container, you can exit by typing `exit` or pressing <kbd>Ctrl</kbd>+<kbd>D</kbd>.  
+---
+
+## ⚠️ First-Time Setup (Install Bochs in the Container)
+
+After the first run, enter the container and run:
+
+```bash
+cd /root/pintos/src/misc
+env SRCDIR=/root/ PINTOSDIR=/root/pintos/ DSTDIR=/usr/local ./bochs-2.2.6-build.sh
+cd ..
+```
+
+You only need to do this once, unless the container is deleted.
+
+---
+
+Once inside the container, you can exit by typing `exit` or pressing <kbd>Ctrl</kbd>+<kbd>D</kbd>.
 This will automatically stop the container as long as no background processes are keeping it alive.
 
 ---
