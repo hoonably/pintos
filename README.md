@@ -64,18 +64,7 @@ docker run --platform=linux/amd64 -it -p 80:80 \
 ```
 
 ---
-
 <br>
-
-## Subsequent Runs
-
-To start the container again after the initial run:
-
-```bash
-docker start -ai pintos
-```
-
----
 
 ## ⚠️ First-Time Setup (Install Bochs in the Container)
 
@@ -89,9 +78,17 @@ cd ..
 
 You only need to do this once, unless the container is deleted.
 
----
-
 Once inside the container, you can exit by typing `exit` or pressing <kbd>Ctrl</kbd>+<kbd>D</kbd>.
 This will automatically stop the container as long as no background processes are keeping it alive.
+
+---
+
+### 🔁 Subsequent Runs
+
+To start the container again after it has been created:
+
+```bash
+docker start -ai pintos
+```
 
 ---
