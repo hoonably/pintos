@@ -135,9 +135,17 @@ make check
 <details>
 <summary>📋 Result</summary>
 
-**7 / 7 tests passed**
+**9 / 9 tests passed**
 ```bash
-
+pass tests/threads/alarm-single
+pass tests/threads/alarm-multiple
+pass tests/threads/alarm-simultaneous
+pass tests/threads/alarm-priority
+pass tests/threads/alarm-zero
+pass tests/threads/alarm-negative
+pass tests/threads/priority-change
+pass tests/threads/priority-fifo
+pass tests/threads/priority-preempt
 ```
 
 </details>
@@ -378,7 +386,7 @@ pass tests/vm/pt-write-code
 pass tests/vm/pt-write-code2
 pass tests/vm/pt-grow-stk-sc
 pass tests/vm/page-linear
-FAIL tests/vm/page-parallel
+FAIL tests/vm/page-parallel     # suspected race condition
 pass tests/vm/page-merge-seq
 pass tests/vm/page-merge-par
 pass tests/vm/page-merge-stk
@@ -449,7 +457,6 @@ make check
 <summary>📋 Result</summary>
 
 **7 / 7 tests passed**
-total : 86 / 121 tests passed
 
 ```bash
 pass tests/filesys/extended/grow-create
