@@ -144,10 +144,29 @@ inode_create (block_sector_t sector, off_t length)
         block_write(fs_device, disk_inode->direct_block[i], zeros);
       }
 
-      // TODO: indirect_block
-      // if (sectors > INODE_DIRECT_CNT) {
+      //! indirect_block
+      if (sectors > INODE_DIRECT_CNT) {
+        size_t indirect_cnt = sectors - INODE_DIRECT_CNT;
 
-      // }
+        // 인디렉트 블록 하나 할당
+        if (!free_map_allocate(1, &disk_inode->indirect_block_sector)) {
+          return false;
+        }
+
+        block_sector_t indirect_block[INDIRECT_BLOCK_CNT];
+        memset(indirect_block, 0, sizeof(indirect_block));
+
+        // 각 인디렉트 엔트리마다 블록 할당 + 0으로 초기화
+        for (i = 0; i < indirect_cnt; i++) {
+          if (!free_map_allocate(1, &indirect_block[i])) {
+            return false;
+          }
+          block_write(fs_device, indirect_block[i], zeros);
+        }
+
+        // 인디렉트 블록 자체를 디스크에 기록
+        block_write(fs_device, disk_inode->indirect_block_sector, indirect_block);
+      }
 
       // 전체 섹터 정상 할당된 경우
       block_write(fs_device, sector, disk_inode);
@@ -236,7 +255,23 @@ inode_close (struct inode *inode)
           for (i = 0; i < sectors; i++) {
             free_map_release(inode->data.direct_block[i], 1);
           }
-          // TODO: indirect block 해제
+          //! indirect block 해제
+          if (sectors > INODE_DIRECT_CNT && inode->data.indirect_block_sector != 0) {
+            size_t indirect_cnt = sectors - INODE_DIRECT_CNT;
+
+            block_sector_t indirect_block[INDIRECT_BLOCK_CNT];
+            block_read(fs_device, inode->data.indirect_block_sector, indirect_block);
+
+            size_t i;
+            for (i = 0; i < indirect_cnt; i++) {
+              if (indirect_block[i] != 0) {
+                free_map_release(indirect_block[i], 1);
+              }
+            }
+
+            // indirect block 자체도 해제
+            free_map_release(inode->data.indirect_block_sector, 1);
+          }
         }
 
       free (inode); 
@@ -329,7 +364,7 @@ bool inode_grow(struct inode *inode, off_t new_length) {
     block_write(fs_device, inode->data.direct_block[i], zeros);
   }
 
-  // TODO: indirect block grow
+  //! indirect block grow
   if (new_sectors > INODE_DIRECT_CNT) {
     size_t indirect_needed = new_sectors - INODE_DIRECT_CNT;
     block_sector_t indirect_block[INDIRECT_BLOCK_CNT];
