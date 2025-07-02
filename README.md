@@ -437,6 +437,9 @@ Manual: [Pintos Project 4](https://www.scs.stanford.edu/10wi-cs140/pintos/pintos
 
 This extra credit project focused solely on file growth features, omitting full file system extensions due to time constraints.
 
+> 🧭 Note: This project was not based on Project 3 (Virtual Memory).
+> It was branched directly from the final state of Project 2, as it only required file system enhancements unrelated to virtual memory.
+
 #### 📌 Related Code  
 * `filesys/inode.c` – Indexed inode (direct + single indirect), dynamic growth, and partial free logic
 
