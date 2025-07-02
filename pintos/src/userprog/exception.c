@@ -169,7 +169,7 @@ page_fault (struct intr_frame *f)
      which fault_addr refers. */
 
   //? DEBUG
-//   printf ("✅ Page fault at %p: %s error %s page in %s context.\n",
+//   printf (" Page fault at %p: %s error %s page in %s context.\n",
 //           fault_addr,
 //           not_present ? "not present" : "rights violation",
 //           write ? "writing" : "reading",
@@ -192,8 +192,8 @@ page_fault (struct intr_frame *f)
         // fault_addr 범위가 Growable Stack 영역인가?
         // TODO: 여기서 exit안해야하는 것도 exit(-1) 해버리는 상황 해결해야함. 논리상 맞는거같은데... 뭔가 위에서 문제인가
         // TODO: 현재 상태 : 갑자기 쭉 늘어나다가 0x24로 넘어가서 범위 컷으로 exit(-1)됨 오버플로우?
-         // ✅ Page fault at 0x81c4000: not present error writing page in user context.
-         // ✅ Page fault at 0x24: not present error writing page in kernel context.
+         //  Page fault at 0x81c4000: not present error writing page in user context.
+         //  Page fault at 0x24: not present error writing page in kernel context.
          // 🚨 범위 이상함
 
         // make check 너무 오래걸리니까 따로 체크하는 법
