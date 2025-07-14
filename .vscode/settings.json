@@ -1,7 +1,0 @@
-{
-    "files.associations": {
-        "cstdint": "c",
-        "charconv": "c",
-        "syscall.h": "c"
-    }
-}
